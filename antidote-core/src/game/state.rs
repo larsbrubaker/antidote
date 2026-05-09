@@ -120,6 +120,10 @@ pub struct World {
     /// Set true once the slide-out min antidote cost has been charged for the
     /// current growing bubble. Mirrors `slideOutCharged` in the JS reference.
     pub slide_out_charged: bool,
+    /// Radius at the time of the last `resize_growing_bubble_collider` call.
+    /// Used so we don't tear down + rebuild the rapier collider every frame
+    /// for a tiny radius bump.
+    pub last_grown_collider_radius: f32,
 }
 
 impl World {
@@ -141,6 +145,7 @@ impl World {
             pointer_y: 0.0,
             pointer_down: false,
             slide_out_charged: false,
+            last_grown_collider_radius: 0.0,
         }
     }
 }

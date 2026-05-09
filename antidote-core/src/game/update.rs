@@ -194,9 +194,16 @@ fn grow_bubble(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
     g.x = g.x.clamp(g.radius, VIRTUAL_WIDTH - g.radius);
     g.y = g.y.clamp(g.radius, VIRTUAL_HEIGHT - g.radius);
 
-    // Resize the rapier collider to match.
+    // Resize the rapier collider only when the radius has moved meaningfully —
+    // tearing down + recreating a collider every frame is expensive. 0.5 px
+    // is well below the visual difference but still tracks the bubble's
+    // collision behaviour with viruses correctly.
     if let Some(h) = g.body {
-        physics.resize_growing_bubble_collider(h, g.radius);
+        let last = world.last_grown_collider_radius;
+        if (g.radius - last).abs() >= 0.5 {
+            physics.resize_growing_bubble_collider(h, g.radius);
+            world.last_grown_collider_radius = g.radius;
+        }
     }
 
     // Collision-solidify with solid bubbles.

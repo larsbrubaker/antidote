@@ -27,6 +27,14 @@ rapier2d = "0.22"
 # [patch.crates-io]
 # agg-gui = { path = "../agg-gui/agg-gui" }
 
+# ---------------------------------------------------------------------------
+# Optimize dependencies in debug builds. The agg-rust software rasterizer +
+# rapier2d are both expensive unoptimized — without this dev frame time drops
+# to ~5 fps. Mirrors agg-gui's own workspace profile.
+# ---------------------------------------------------------------------------
+[profile.dev.package."*"]
+opt-level = 2
+
 [profile.release]
 opt-level = 3
 lto = "thin"

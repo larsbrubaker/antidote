@@ -13,6 +13,7 @@
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
+use std::time::Instant;
 
 use agg_gui::{winit_adapter, App, Framebuffer, GfxCtx, Modifiers, Size};
 use antidote_core::ui::game_widget::GameWidget;
@@ -51,6 +52,11 @@ fn main() {
     let mut cursor_x = 0.0_f64;
     let mut cursor_y = 0.0_f64;
     let mut current_mods = Modifiers::default();
+
+    // Light-touch frame-time logger — averages over 30 frames, prints once per
+    // ~half second so we can spot regressions without spamming stdout.
+    let mut frame_count: u32 = 0;
+    let mut frame_window_start = Instant::now();
 
     event_loop
         .run(move |event, elwt| match event {
@@ -152,6 +158,17 @@ fn main() {
                 ..
             } => {
                 paint_frame(&mut framebuffer, &mut app, &mut surface, win_w, win_h);
+                frame_count += 1;
+                if frame_count >= 60 {
+                    let avg_ms =
+                        frame_window_start.elapsed().as_secs_f64() * 1000.0 / frame_count as f64;
+                    eprintln!(
+                        "antidote: {avg_ms:.1} ms/frame ({:.0} fps)",
+                        1000.0 / avg_ms
+                    );
+                    frame_count = 0;
+                    frame_window_start = Instant::now();
+                }
             }
 
             Event::AboutToWait => {
@@ -177,13 +194,10 @@ fn paint_frame(
     if framebuffer.width() != win_w || framebuffer.height() != win_h {
         framebuffer.resize(win_w, win_h);
     }
-    // Clear to opaque black before each frame; the scene paints over it.
-    for chunk in framebuffer.pixels_mut().chunks_exact_mut(4) {
-        chunk[0] = 0;
-        chunk[1] = 0;
-        chunk[2] = 0;
-        chunk[3] = 255;
-    }
+    // No explicit clear — `paint_background_and_grid` covers the full
+    // letterboxed game area, and the letterbox bars are left untouched
+    // (they stay whatever the previous frame had, which is fine because
+    // the framebuffer was zeroed at allocation time).
 
     {
         let mut ctx = GfxCtx::new(framebuffer);
