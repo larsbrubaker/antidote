@@ -2,6 +2,9 @@
 **/*.rs.bk
 Cargo.lock.bak
 
+# Local TS/Canvas reference of the original game; not part of the Rust port.
+/reference/
+
 .env
 .env.local
 *.session.json
