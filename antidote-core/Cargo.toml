@@ -13,6 +13,7 @@ agg-gui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 web-time = { workspace = true }
+rapier2d = { workspace = true }
 flume = { version = "0.11", default-features = false, features = ["async"] }
 futures-util = { version = "0.3", default-features = false }
 thiserror = "1"
