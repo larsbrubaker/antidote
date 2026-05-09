@@ -23,6 +23,7 @@ pub fn init_level(world: &mut World, physics: &mut PhysicsWorld) {
     world.pop_animations.clear();
     world.growing = None;
     world.pointer_down = false;
+    world.phase_elapsed = 0.0;
     world.slide_out_charged = false;
 
     world.total_antidote_time = total_antidote_time_for(world.level);

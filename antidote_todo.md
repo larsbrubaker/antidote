@@ -8,6 +8,7 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 
 - **M0/M1** — 4-crate workspace skeleton, Supabase Postgres schema applied, multi-game DB design (`games`, `user_scores`, `user_progress`, `user_settings`), CI + Pages deploy wired.
 - **M2** — Native gameplay MVP. Full game loop, rapier2d physics with JS-faithful body params, pixel-faithful render of every JS Canvas helper (`paint_bubble`, `paint_virus`, `paint_dead_virus`, `paint_dying_virus`, `paint_pop_animation`, background+grid+border), pointer event handling, level init + virus spawn, dying lifecycle, pop lifecycle, life-loss + level-complete transitions. 12 unit tests.
+- **Fixed simulation timestep** — gameplay/physics runs at 60 Hz through `antidote-core::game::timestep::FixedTimestep`. Rendering may happen at any cadence; slow frames catch up with at most four fixed updates before a draw (15 fps floor) and drop excess accumulated time rather than taking large collision steps.
 - **Native shell** — winit 0.30 + software AGG rasterizer + softbuffer present. `cargo run -p antidote-native` opens a 800×600 window with the playable game. After the `[profile.dev.package."*"] opt-level = 2` fix, frame time is ~25 ms (release) / ~35 ms (debug).
 - **Local-dev policy** — `[patch.crates-io] agg-gui = { path = "../agg-gui/agg-gui" }` is active by default; CI clones agg-gui sibling so the patch resolves there too. agg-gui is grown in place when antidote needs new features. See [CLAUDE.md](CLAUDE.md).
 - **Pages deploy** — Vite `base: "./"` and relative `runtime-config.json` fetch; `https://larsbrubaker.github.io/antidote/` loads cleanly.
@@ -99,7 +100,7 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 2. **Pause overlay** — Esc / P key toggles Phase::Playing ↔ Phase::Paused. Resume button + back-to-menu button.
 3. **Game-over screen** — final score, "Play again" + back-to-menu, plus an upsert if the user is signed in.
 4. **Level-complete screen** — short pause showing score gained + "Next level" button.
-5. **Life-lost animation** — JS reference floats the new lives counter from canvas center to the HUD lives icon. Needs `antidote-core::ui::menu_widget` + agg-gui transient overlay support.
+5. **Life-lost animation** — JS reference floats the new lives counter from canvas center to the HUD lives icon. The shared game-state transition is now ported: `LifeLost` holds for 1.2 s, then restarts the level or enters `GameOver`. Remaining work: visual floating-lives overlay via `antidote-core::ui::menu_widget` + agg-gui transient overlay support.
 6. **HUD as a real widget tree** — currently the HUD is drawn inside the GameWidget paint. Split into a top bar widget for lives + level + antidote bar + score that lays out around the game widget.
 
 ---

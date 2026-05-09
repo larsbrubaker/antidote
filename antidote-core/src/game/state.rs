@@ -117,6 +117,8 @@ pub struct World {
     pub pointer_x: f32,
     pub pointer_y: f32,
     pub pointer_down: bool,
+    /// Seconds spent in the current non-playing transition phase.
+    pub phase_elapsed: f32,
     /// Set true once the slide-out min antidote cost has been charged for the
     /// current growing bubble. Mirrors `slideOutCharged` in the JS reference.
     pub slide_out_charged: bool,
@@ -144,6 +146,7 @@ impl World {
             pointer_x: 0.0,
             pointer_y: 0.0,
             pointer_down: false,
+            phase_elapsed: 0.0,
             slide_out_charged: false,
             last_grown_collider_radius: 0.0,
         }

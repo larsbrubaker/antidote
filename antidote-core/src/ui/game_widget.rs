@@ -7,6 +7,7 @@ use web_time::Instant;
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::physics::PhysicsWorld;
 use crate::game::state::World;
+use crate::game::timestep::{FixedTimestep, FIXED_DT};
 use crate::game::update;
 use crate::render::scene;
 
@@ -17,8 +18,10 @@ pub struct GameWidget {
     pub physics: PhysicsWorld,
     /// Wall-clock start; used to compute a monotonic time for animations.
     epoch: Instant,
-    /// Last `paint` time; used to compute the per-frame `dt` for `tick`.
+    /// Last `paint` time; only used to feed elapsed wall-time into the fixed
+    /// timestep accumulator. Simulation itself always runs at 60 Hz.
     last_paint: Option<Instant>,
+    timestep: FixedTimestep,
 }
 
 impl GameWidget {
@@ -33,6 +36,7 @@ impl GameWidget {
             physics,
             epoch: Instant::now(),
             last_paint: None,
+            timestep: FixedTimestep::new(),
         }
     }
 
@@ -115,13 +119,16 @@ impl Widget for GameWidget {
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
         let now = Instant::now();
-        let dt = match self.last_paint {
-            Some(prev) => (now - prev).as_secs_f32().min(0.1), // cap dt at 100 ms
-            None => 1.0 / 60.0,
+        let elapsed = match self.last_paint {
+            Some(prev) => (now - prev).as_secs_f32(),
+            None => FIXED_DT,
         };
         self.last_paint = Some(now);
 
-        update::tick(&mut self.world, &mut self.physics, dt);
+        let batch = self.timestep.advance(elapsed);
+        for _ in 0..batch.steps {
+            update::tick(&mut self.world, &mut self.physics, batch.dt);
+        }
 
         let lb = self.letterbox();
         let time_seconds = self.epoch.elapsed().as_secs_f32();

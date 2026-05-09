@@ -16,10 +16,21 @@ use crate::game::state::{
 pub const POP_ANIMATION_DURATION: f32 = 0.3;
 /// Dying virus death_progress runs from 0 to 1 over this many seconds.
 pub const DYING_VIRUS_DURATION: f32 = 0.8;
+/// The JS reference holds the life-lost state for this long before resuming.
+pub const LIFE_LOST_DURATION: f32 = 1.2;
 
 /// One simulation tick. Called from `GameWidget::paint` once per frame
 /// (or from a dedicated game-tick path if/when one is split out).
 pub fn tick(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
+    // The JS reference advances pop rings regardless of game state so a bubble
+    // popped by life loss or level completion can finish animating under overlays.
+    advance_pop_animations(world, dt);
+
+    if world.phase == Phase::LifeLost {
+        advance_life_lost(world, physics, dt);
+        return;
+    }
+
     if world.phase != Phase::Playing {
         return;
     }
@@ -42,7 +53,6 @@ pub fn tick(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
 
     update_trap_timers(world, physics, dt);
     advance_dying_viruses(world, physics, dt);
-    advance_pop_animations(world, dt);
     check_level_complete(world);
 }
 
@@ -420,11 +430,22 @@ fn check_virus_growing_bubble_collision(world: &mut World, physics: &mut Physics
         if world.lives > 0 {
             world.lives -= 1;
         }
-        if world.lives == 0 {
-            world.phase = Phase::GameOver;
-        } else {
-            world.phase = Phase::LifeLost;
-        }
+        world.phase = Phase::LifeLost;
+        world.phase_elapsed = 0.0;
+    }
+}
+
+fn advance_life_lost(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
+    world.phase_elapsed += dt;
+    if world.phase_elapsed < LIFE_LOST_DURATION {
+        return;
+    }
+
+    world.phase_elapsed = 0.0;
+    if world.lives == 0 {
+        world.phase = Phase::GameOver;
+    } else {
+        init_level(world, physics);
     }
 }
 
@@ -521,5 +542,64 @@ mod tests {
         // Tick once to advance death_progress past 1.
         tick(&mut world, &mut physics, DYING_VIRUS_DURATION);
         assert_eq!(world.phase, Phase::LevelComplete);
+    }
+
+    #[test]
+    fn pop_animations_advance_while_not_playing() {
+        let mut world = World::new();
+        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        world.phase = Phase::LifeLost;
+        world.pop_animations.push(PopAnimation {
+            x: 100.0,
+            y: 100.0,
+            radius: 12.0,
+            progress: 0.0,
+        });
+
+        tick(&mut world, &mut physics, POP_ANIMATION_DURATION * 0.5);
+        assert_eq!(world.pop_animations.len(), 1);
+        assert!(world.pop_animations[0].progress > 0.49);
+
+        tick(&mut world, &mut physics, POP_ANIMATION_DURATION * 0.6);
+        assert!(world.pop_animations.is_empty());
+        assert_eq!(world.phase, Phase::LifeLost);
+    }
+
+    #[test]
+    fn life_lost_restarts_level_after_transition() {
+        let mut world = World::new();
+        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        world.phase = Phase::LifeLost;
+        world.lives = 2;
+        world.phase_elapsed = LIFE_LOST_DURATION - 0.01;
+        world.solid_bubbles.push(Bubble {
+            x: 200.0,
+            y: 200.0,
+            radius: 20.0,
+            vx: 0.0,
+            vy: 0.0,
+            body: None,
+        });
+
+        tick(&mut world, &mut physics, 0.02);
+
+        assert_eq!(world.phase, Phase::Playing);
+        assert_eq!(world.lives, 2);
+        assert_eq!(world.level, 1);
+        assert!(world.solid_bubbles.is_empty());
+        assert_eq!(world.phase_elapsed, 0.0);
+    }
+
+    #[test]
+    fn final_life_lost_transitions_to_game_over_after_delay() {
+        let mut world = World::new();
+        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        world.phase = Phase::LifeLost;
+        world.lives = 0;
+
+        tick(&mut world, &mut physics, LIFE_LOST_DURATION);
+
+        assert_eq!(world.phase, Phase::GameOver);
+        assert_eq!(world.phase_elapsed, 0.0);
     }
 }
