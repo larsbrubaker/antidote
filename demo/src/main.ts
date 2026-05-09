@@ -31,6 +31,22 @@ async function main() {
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
 
+  // OAuth callback handler: Supabase redirects back to this page with
+  // `#access_token=...&refresh_token=...&expires_in=...&token_type=bearer`
+  // appended to the URL. Hand those tokens to wasm so the rest of the UI
+  // sees a fresh signed-in session, then clean the URL so a refresh
+  // doesn't try to install the same tokens twice.
+  if (window.location.hash.startsWith("#access_token=")) {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token") ?? "";
+    const expiresIn = parseInt(params.get("expires_in") ?? "3600", 10);
+    if (accessToken) {
+      wasm.oauth_complete(accessToken, refreshToken, isNaN(expiresIn) ? 3600 : expiresIn);
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }
+
   const resizeCanvas = () => {
     const dpr = Math.max(0.5, window.devicePixelRatio || 1);
     const maxWidth = window.innerWidth;

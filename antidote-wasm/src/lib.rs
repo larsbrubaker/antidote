@@ -30,13 +30,14 @@ use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use agg_gui::{App, Modifiers, MouseButton};
-use antidote_core::ui::build_antidote_app;
+use antidote_core::ui::{build_antidote_app, game_model::SharedModel};
 use demo_wgpu::{begin_frame, WgpuGfxCtx};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
+    static MODEL: RefCell<Option<SharedModel>> = const { RefCell::new(None) };
     static WGPU_INIT: RefCell<Option<WgpuInit>> = const { RefCell::new(None) };
     static WGPU_CTX: RefCell<Option<WgpuGfxCtx>> = const { RefCell::new(None) };
     static NEEDS_DRAW: Cell<bool> = const { Cell::new(true) };
@@ -144,10 +145,59 @@ async fn init_wgpu_async() -> Result<WgpuInit, String> {
 
 fn ensure_app() {
     APP.with(|cell| {
-        if cell.borrow().is_none() {
-            *cell.borrow_mut() = Some(build_antidote_app());
+        if cell.borrow().is_some() {
+            return;
         }
+        let (app, model) = build_antidote_app();
+        *cell.borrow_mut() = Some(app);
+        MODEL.with(|m| *m.borrow_mut() = Some(model));
     });
+}
+
+/// Drain `pending_open_url` and redirect the page. The site's TS shell
+/// will catch the OAuth round-trip's `#access_token=...&...` fragment on
+/// reload and call `oauth_complete` below to install the session.
+fn drain_pending_open_url() {
+    let url: Option<String> = MODEL.with(|cell| {
+        cell.borrow()
+            .as_ref()
+            .and_then(|m| m.borrow_mut().pending_open_url.take())
+    });
+    let Some(url) = url else { return };
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let _ = window.location().set_href(&url);
+}
+
+/// Drain the OAuth-button click signal into a `pending_open_url`, using
+/// the current page origin + path as the post-OAuth redirect target. Must
+/// be a value that's listed in the project's "Allowed redirect URLs"
+/// (Supabase Dashboard → Authentication → URL Configuration).
+fn drain_pending_oauth_with_origin() {
+    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
+    let Some(model) = model else { return };
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let location = window.location();
+    let origin = location.origin().unwrap_or_default();
+    let pathname = location.pathname().unwrap_or_default();
+    let redirect_to = format!("{origin}{pathname}");
+    antidote_core::ui::drain_pending_oauth(&model, &redirect_to);
+}
+
+/// Wasm-bindgen entry point the TS shell calls on page load when it
+/// detects an OAuth callback fragment in `window.location.hash`. The
+/// session is registered the same way email/password sign-ins land — via
+/// the db inbox — so the rest of the UI sees a fresh `auth.session`
+/// without any other special-casing.
+#[wasm_bindgen]
+pub fn oauth_complete(access_token: String, refresh_token: String, expires_in: i64) {
+    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
+    let Some(model) = model else { return };
+    antidote_core::ui::record_oauth_session(&model, access_token, refresh_token, expires_in);
+    mark_dirty();
 }
 
 fn ensure_wgpu_ctx(width: f32, height: f32) {
@@ -194,6 +244,8 @@ pub fn render(width: u32, height: u32, _frame_ms: f64) {
         return;
     }
     ensure_app();
+    drain_pending_oauth_with_origin();
+    drain_pending_open_url();
     ensure_wgpu_ctx(width as f32, height as f32);
     resize_surface_if_needed(width, height);
 

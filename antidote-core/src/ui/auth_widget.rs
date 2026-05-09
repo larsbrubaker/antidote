@@ -23,6 +23,7 @@ use agg_gui::widgets::label::{Label, LabelAlign};
 use agg_gui::widgets::text_field::TextField;
 use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
+use crate::db::auth::OAuthProvider;
 use crate::game::state::Phase;
 use crate::ui::game_model::{MenuView, SharedModel};
 use crate::ui::menu_widget::{
@@ -91,6 +92,10 @@ impl SignInOverlay {
             m.menu_view = MenuView::Main;
         });
 
+        let google_btn = oauth_button(OAuthProvider::Google, font.clone(), model.clone());
+        let facebook_btn = oauth_button(OAuthProvider::Facebook, font.clone(), model.clone());
+        let apple_btn = oauth_button(OAuthProvider::Apple, font.clone(), model.clone());
+
         let children: Vec<Box<dyn Widget>> = vec![
             header_label("Sign in", font.clone(), 30.0),
             body_label(
@@ -103,6 +108,9 @@ impl SignInOverlay {
             Box::new(error_label),
             signin_btn,
             signup_btn,
+            google_btn,
+            facebook_btn,
+            apple_btn,
             back_btn,
         ];
 
@@ -124,6 +132,25 @@ impl SignInOverlay {
             .unwrap_or_default();
         self.children[4].set_label_text(&text);
     }
+}
+
+/// Build a "Sign in with X" button that, on click, asks the platform shell
+/// to open Supabase's `/auth/v1/authorize` URL for the chosen provider.
+/// Each provider must be configured (Client ID + Secret) in the Supabase
+/// Dashboard before the round trip will succeed; until then the user lands
+/// on a Supabase error page. See `db/README.md`.
+fn oauth_button(provider: OAuthProvider, font: Arc<Font>, model: SharedModel) -> Box<dyn Widget> {
+    let label = format!("Sign in with {}", provider.display_name());
+    secondary_button(&label, font, move || {
+        let mut m = model.borrow_mut();
+        // The platform shell looks up its own redirect target; here we just
+        // mark which provider was requested. The shell builds the URL via
+        // `AuthClient::oauth_url` (it knows its own origin) and assigns to
+        // `pending_open_url`. Doing it client-side keeps antidote-core
+        // free of any platform/redirect-URL knowledge.
+        m.auth.pending_oauth = Some(provider);
+        m.auth.last_error = None;
+    })
 }
 
 fn submit(

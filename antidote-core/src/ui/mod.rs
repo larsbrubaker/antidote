@@ -24,7 +24,8 @@ pub mod menu_widget;
 pub mod other_games_widget;
 pub mod overlay_stack;
 
-use crate::db::inbox::DbInboxEvent;
+use crate::db::auth::AuthClient;
+use crate::db::inbox::{DbInboxEvent, Session};
 use crate::game::state::Phase;
 use auth_widget::SignInOverlay;
 #[cfg(test)]
@@ -47,15 +48,17 @@ fn load_default_font() -> Arc<Font> {
 }
 
 /// Build the shared Antidote application with the default Supabase config
-/// (production publishable key + project URL). Use this from production
-/// shells.
-pub fn build_antidote_app() -> App {
+/// (production publishable key + project URL). Returns `(App, SharedModel)`
+/// — shells need the second value to drive `drain_db_inbox`,
+/// `tick_score_sync`, `drain_pending_oauth`, and the OAuth-callback
+/// session injection.
+pub fn build_antidote_app() -> (App, SharedModel) {
     build_antidote_app_with_config(SupabaseConfig::antidote_default())
 }
 
 /// Same as [`build_antidote_app`] but with a caller-supplied Supabase
 /// config. Tests + alternate deployments use this entry point.
-pub fn build_antidote_app_with_config(config: SupabaseConfig) -> App {
+pub fn build_antidote_app_with_config(config: SupabaseConfig) -> (App, SharedModel) {
     let model: SharedModel = shared_with_config(config);
     let font = load_default_font();
 
@@ -91,10 +94,66 @@ pub fn build_antidote_app_with_config(config: SupabaseConfig) -> App {
     let mut app = App::new(Box::new(root));
 
     // Esc/P toggles pause when in Playing or Paused; ignored otherwise.
-    let key_model = model;
+    let key_model = model.clone();
     app.set_global_key_handler(move |key, _mods| toggle_pause_on_key(&key_model, &key));
 
-    app
+    (app, model)
+}
+
+/// Drain the OAuth-button click signal, build a Supabase
+/// `/auth/v1/authorize` URL for the requested provider, and stash it in
+/// `pending_open_url` for the shell to actually navigate to. Call this
+/// from each platform shell once per frame, passing the redirect URL
+/// that's appropriate for that platform (e.g. on web the current page
+/// origin, on native a `localhost:PORT` callback).
+///
+/// This stays out of `tick_score_sync` / `drain_db_inbox` because the
+/// redirect URL is shell-specific — the core can't know it.
+pub fn drain_pending_oauth(model: &SharedModel, redirect_to: &str) {
+    let mut m = model.borrow_mut();
+    let Some(provider) = m.auth.pending_oauth.take() else {
+        return;
+    };
+    if m.services.config.url.is_empty() {
+        m.auth.last_error = Some("Supabase URL not configured".to_owned());
+        return;
+    }
+    let url = m.services.auth.oauth_url(provider, redirect_to);
+    m.pending_open_url = Some(url);
+}
+
+/// Record a session that arrived via an OAuth redirect (web) or local
+/// callback handler (native). Called by the platform shell after parsing
+/// `#access_token=...&refresh_token=...&expires_in=...` out of the
+/// callback URL. Pushes the same `DbInboxEvent::SignInResult(Ok(_))` the
+/// email/password path uses, so the regular drain hook handles all the
+/// downstream work (set bearer, navigate to Main, fetch games catalog).
+pub fn record_oauth_session(
+    model: &SharedModel,
+    access_token: String,
+    refresh_token: String,
+    expires_in: i64,
+) {
+    let session = AuthClient::session_from_oauth_tokens(access_token, refresh_token, expires_in);
+    let m = model.borrow();
+    let _ = m
+        .services
+        .inbox
+        .tx
+        .send(DbInboxEvent::SignInResult(Ok(session)));
+}
+
+/// Manually inject a Session — used by tests and by storage-backed
+/// "remember me" restores. Keeps the same downstream side effects as a
+/// fresh sign-in.
+#[allow(dead_code)]
+pub fn restore_session(model: &SharedModel, session: Session) {
+    let m = model.borrow();
+    let _ = m
+        .services
+        .inbox
+        .tx
+        .send(DbInboxEvent::SignInResult(Ok(session)));
 }
 
 /// Push the current session's score to Supabase if the player just

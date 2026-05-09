@@ -133,7 +133,7 @@ fn main() {
 
     let mut gpu = Gpu::new(window.clone());
 
-    let mut app = build_antidote_app();
+    let (mut app, model) = build_antidote_app();
     let mut wgpu_ctx = WgpuGfxCtx::new(
         Arc::clone(&gpu.device),
         Arc::clone(&gpu.queue),
@@ -252,6 +252,20 @@ fn main() {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
+                // Drain pending OAuth click → URL into pending_open_url.
+                // For native there's no localhost callback yet, so we use a
+                // sentinel redirect that lands the user on a Supabase
+                // success page; they manually return to the app and (for
+                // now) sign in via email/password instead.
+                antidote_core::ui::drain_pending_oauth(
+                    &model,
+                    "https://edupgibalgeqfujfkwmm.supabase.co/auth/v1/callback",
+                );
+                if let Some(url) = model.borrow_mut().pending_open_url.take() {
+                    if let Err(err) = webbrowser::open(&url) {
+                        eprintln!("antidote: failed to open browser for OAuth: {err}");
+                    }
+                }
                 paint_frame(&gpu, &mut wgpu_ctx, &mut app, win_w, win_h);
                 frame_count += 1;
                 if frame_count >= 60 {

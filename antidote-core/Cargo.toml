@@ -23,6 +23,11 @@ flume = { version = "0.11", default-features = false, features = ["async"] }
 futures-util = { version = "0.3", default-features = false }
 thiserror = "1"
 rand = "0.8"
+# Used to decode the JWT payload returned by OAuth so we can fill in the
+# Session.user_id / email without an extra `/auth/v1/user` round trip.
+# Standard URL-safe-no-pad base64; no encryption / verification — we trust
+# the token we just received from Supabase.
+base64 = "0.22"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }

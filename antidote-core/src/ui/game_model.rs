@@ -20,7 +20,7 @@ use std::rc::Rc;
 use web_time::Instant;
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
-use crate::db::auth::AuthClient;
+use crate::db::auth::{AuthClient, OAuthProvider};
 use crate::db::client::PostgrestClient;
 use crate::db::inbox::{DbInbox, Session};
 use crate::db::models::{Game, LeaderboardEntry};
@@ -84,6 +84,11 @@ pub struct AuthState {
     /// attempt. Cleared on the next successful sign-in or whenever the
     /// user navigates away from the SignIn view.
     pub last_error: Option<String>,
+    /// Set by an "Sign in with X" button click; the platform shell takes +
+    /// clears it each frame, builds the OAuth URL with its own redirect
+    /// target, and either redirects (web) or opens the system browser
+    /// (native).
+    pub pending_oauth: Option<OAuthProvider>,
 }
 
 impl AuthState {
@@ -170,6 +175,11 @@ pub struct GameModel {
     pub menu_view: MenuView,
     pub menu_caches: MenuCaches,
     pub score_sync: ScoreSyncState,
+    /// Pending side-effect: the platform shell should open this URL in the
+    /// browser. Used to launch OAuth round trips without coupling
+    /// antidote-core to either `web_sys` or `webbrowser`.
+    /// Shells take + clear this every frame.
+    pub pending_open_url: Option<String>,
 }
 
 impl GameModel {
@@ -185,6 +195,7 @@ impl GameModel {
             menu_view: MenuView::Main,
             menu_caches: MenuCaches::default(),
             score_sync: ScoreSyncState::default(),
+            pending_open_url: None,
         }
     }
 

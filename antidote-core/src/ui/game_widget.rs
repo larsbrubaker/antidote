@@ -6,11 +6,11 @@ use agg_gui::{DrawCtx, Event, EventResult, MouseButton, Point, Rect, Widget};
 use web_time::Instant;
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
-use agg_gui::timestep::FIXED_DT;
 use crate::game::update;
 use crate::render::scene;
 use crate::ui::game_model::SharedModel;
 use crate::ui::hud_widget::HUD_HEIGHT;
+use agg_gui::timestep::FIXED_DT;
 
 pub struct GameWidget {
     bounds: Rect,
