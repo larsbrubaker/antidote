@@ -1,0 +1,29 @@
+[package]
+name = "antidote-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core game logic, widgets, and Supabase client for the Antidote game (target-agnostic; works on native and wasm32)."
+
+[dependencies]
+agg-gui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+web-time = { workspace = true }
+flume = { version = "0.11", default-features = false, features = ["async"] }
+futures-util = { version = "0.3", default-features = false }
+thiserror = "1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen-futures = "0.4"
+
+[lib]
+crate-type = ["rlib"]

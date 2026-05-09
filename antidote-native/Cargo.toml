@@ -1,0 +1,21 @@
+[package]
+name = "antidote-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Native (winit + wgpu) shell for the Antidote game."
+
+[dependencies]
+antidote-core = { path = "../antidote-core" }
+agg-gui = { workspace = true, features = ["winit-adapter", "clipboard"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
+flume = "0.11"
+dotenvy = "0.15"
+dirs = "5"
+pollster = "0.3"
+winit = "0.30"

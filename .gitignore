@@ -1,0 +1,24 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+.env
+.env.local
+*.session.json
+
+node_modules/
+demo/dist
+demo/public/pkg
+demo/public/runtime-config.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# WASM
+/pkg
