@@ -149,12 +149,14 @@ dependencies = [
  "agg-gui",
  "antidote-core",
  "console_error_panic_hook",
+ "demo-wgpu",
  "js-sys",
  "serde",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "wgpu",
 ]
 
 [[package]]

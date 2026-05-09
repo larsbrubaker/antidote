@@ -52,10 +52,10 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 
 **Sub-steps:**
 
-1. Wire `antidote-wasm` with `wasm_bindgen` exports — `start()`, `on_pointer_down/move/up`, `request_redraw()` callback hook. Mirror what `agg-gui/demo-wasm` does.
-2. Pull the same wgpu pipeline introduced in Phase 1, but built for `wgpu` features = `["wgsl", "webgl"]` so it works without WebGPU.
-3. `demo/src/main.ts` imports the wasm-pack output, attaches it to `#antidote-canvas`, drives a `requestAnimationFrame` loop that calls into wasm, forwards `pointerdown/move/up/cancel` + `touchstart/move/end/cancel` events through wasm-bindgen.
-4. Local TS dev path: `bun run dev` works for hot reload of the TS shell while reusing the most-recent wasm-pack output.
+1. **Done — Wire `antidote-wasm` with `wasm_bindgen` exports.** `start()` kicks off async wgpu init; `render(width, height, frame_ms)`, `on_mouse_down/move/up/leave`, `set_device_pixel_ratio`, and `needs_draw()` mirror the agg-gui WASM shell shape while keeping all game/UI construction in `antidote-core`.
+2. **Done — Pull the same wgpu pipeline introduced in Phase 1.** `antidote-wasm` now uses `demo_wgpu::WgpuGfxCtx` with `wgpu` features = `["wgsl", "webgl"]` so it targets WebGL2 instead of requiring WebGPU.
+3. **Done — Wire the TS shell.** `demo/src/main.ts` imports the wasm-pack output, attaches it to `#antidote-canvas`, drives a `requestAnimationFrame` loop that calls into wasm, and forwards pointer events through wasm-bindgen.
+4. **Done — Local TS build path.** `wasm-pack build antidote-wasm --target web --out-dir ../demo/public/pkg --no-typescript` followed by `bun run build` succeeds; `bun run dev` can reuse the most recent wasm-pack output for hot reload of the TS shell.
 5. Verify the deploy artifact size — wgpu + rapier2d + agg-gui together are not small. Aim for under ~5 MB gzipped; if larger, add `wasm-opt` step in CI.
 
 **Risks:**
@@ -141,5 +141,5 @@ After Phase 1 ships, much of this becomes irrelevant — game sprites won't go t
 - New agg-gui features land in `../agg-gui/agg-gui/src/…` directly, not as workarounds in antidote (see CLAUDE.md "Local development uses agg-gui as a path dep").
 - `antidote-core` stays target-agnostic — no `tokio`, no `dotenvy`, no `winit`, no `wgpu` direct deps. Both shells inject services through the `platform::Storage` trait family.
 - `antidote-native` and `antidote-wasm` are platform shells only. All game rules, widget trees, menus, layouts, HUDs, dialogs, leaderboards, and visible UI live in `antidote-core`; shells only create the OS/browser surface, initialize the renderer, forward input, and provide platform services. Match agg-gui's split: **Game / widget / layout code** → `antidote-core`; **GPU renderers** → `demo-wgpu` / agg-gui wgpu backend; **platform shell** → native + wasm crates.
-- The JS reference at `reference/GFG/` is read-only documentation. Constants in `antidote-core/src/consts.rs` are the canonical Rust copies.
+- The JS reference at `gfg/public/games/antidote/` is read-only documentation. Do not modify it, include it in builds, or read/commit `gfg/.env`. Constants in `antidote-core/src/consts.rs` are the canonical Rust copies.
 - Commit straight to the antidote repo's `main` — no feature branches, no worktrees. (Same convention as rust-apps superproject.)

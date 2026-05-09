@@ -1,5 +1,5 @@
 //! Game-design constants ported verbatim from
-//! `reference/GFG/public/games/antidote/antidote-core.js` and `antidote-physics.js`.
+//! `gfg/public/games/antidote/antidote-core.js` and `antidote-physics.js`.
 //! All values match the JS reference exactly.
 
 pub const VIRTUAL_WIDTH: f32 = 800.0;

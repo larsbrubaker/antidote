@@ -1,5 +1,5 @@
 //! Per-frame tick + pointer-input handlers. Mirrors the gameplay surface of
-//! `reference/GFG/public/games/antidote/antidote.js`.
+//! `gfg/public/games/antidote/antidote.js`.
 
 use crate::consts::{
     min_antidote_cost, ANTIDOTE_DRAIN_RATE, BUBBLE_FLOAT_SPEED, BUBBLE_GROW_RATE,
@@ -278,10 +278,9 @@ fn constrain_bubble_position(
     Some((x, y))
 }
 
-/// Convert the current growing bubble into a solid bubble (or pop it if too
-/// small). Mirrors `solidifyBubble` + the parts of the JS reference that
-/// promote the new bubble to a physics-managed body. Always pushes either a
-/// new solid bubble or a pop animation.
+/// Convert the current growing bubble into a solid bubble. Mirrors
+/// `solidifyBubble` in the JS reference: instant clicks are bumped up to
+/// `MIN_VALID_RADIUS`, not discarded, and pay the minimum antidote cost.
 fn solidify_bubble(world: &mut World, physics: &mut PhysicsWorld) {
     let Some(g) = world.growing.take() else {
         return;
@@ -293,15 +292,7 @@ fn solidify_bubble(world: &mut World, physics: &mut PhysicsWorld) {
     }
 
     if g.radius < MIN_VALID_RADIUS {
-        // Pop animation only — too small to be a real bubble.
-        world.pop_animations.push(PopAnimation {
-            x: g.x,
-            y: g.y,
-            radius: g.radius.max(1.0),
-            progress: 0.0,
-        });
-        world.slide_out_charged = false;
-        return;
+        world.antidote = (world.antidote - min_antidote_cost()).max(0.0);
     }
 
     let mut bubble = Bubble {
@@ -462,7 +453,7 @@ mod tests {
     use crate::game::level::init_level as level_init;
 
     #[test]
-    fn solidify_pop_for_too_small_bubble() {
+    fn solidify_instant_click_creates_minimum_bubble() {
         let mut world = World::new();
         let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         on_pointer_down(&mut world, &mut physics, 100.0, 100.0);
@@ -470,12 +461,15 @@ mod tests {
         assert!(world.growing.is_none());
         world.phase = Phase::Playing;
         on_pointer_down(&mut world, &mut physics, 100.0, 100.0);
-        // Growing bubble exists but radius=0; release immediately should pop.
+        // Growing bubble exists but radius=0; the JS reference bumps it up to
+        // the minimum valid radius and charges the minimum antidote cost.
         assert!(world.growing.is_some());
         on_pointer_up(&mut world, &mut physics);
         assert!(world.growing.is_none());
-        assert!(world.solid_bubbles.is_empty());
-        assert_eq!(world.pop_animations.len(), 1);
+        assert_eq!(world.solid_bubbles.len(), 1);
+        assert_eq!(world.solid_bubbles[0].radius, MIN_VALID_RADIUS);
+        assert!(world.pop_animations.is_empty());
+        assert_eq!(world.antidote, 1.0 - min_antidote_cost());
     }
 
     #[test]

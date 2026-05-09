@@ -1,5 +1,5 @@
 //! Scene painter. Pixel-faithful reproduction of the JS Canvas rendering at
-//! `reference/GFG/public/games/antidote/antidote-rendering.js`.
+//! `gfg/public/games/antidote/antidote-rendering.js`.
 //!
 //! Coordinate convention inside this module: JS-style Y-down. The widget's
 //! `paint` method applies a single transform that maps the (0..VIRTUAL_WIDTH,

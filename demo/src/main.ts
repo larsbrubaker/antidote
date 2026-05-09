@@ -1,5 +1,8 @@
-// Loads the wasm-pack output, fetches runtime-config.json (Supabase URL + anon key),
-// and drives the canvas. M5 fills in the actual render/input wiring.
+// Browser platform shell for Antidote.
+//
+// This file owns only DOM/canvas concerns: load wasm-pack output, fetch runtime
+// config, resize the canvas, forward browser input, and drive requestAnimationFrame.
+// Game rules, widget trees, menus, and layout live in antidote-core.
 
 type RuntimeConfig = {
   SUPABASE_URL: string;
@@ -17,19 +20,75 @@ async function main() {
   const config = await loadConfig();
   console.log("antidote: loaded runtime config for", config.SUPABASE_URL);
 
-  // M5: import("/pkg/antidote_wasm.js"), call init(), wire pointer events.
   const canvas = document.getElementById("antidote-canvas") as HTMLCanvasElement | null;
   if (!canvas) throw new Error("missing #antidote-canvas");
 
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = "#222";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#fff";
-    ctx.font = "24px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Antidote — M5 stub", canvas.width / 2, canvas.height / 2);
-  }
+  const baseUrl = import.meta.env.BASE_URL;
+  const wasm = await import(/* @vite-ignore */ `${baseUrl}pkg/antidote_wasm.js`);
+  await wasm.default(`${baseUrl}pkg/antidote_wasm_bg.wasm`);
+
+  const resizeCanvas = () => {
+    const dpr = Math.max(0.5, window.devicePixelRatio || 1);
+    const maxWidth = window.innerWidth;
+    const maxHeight = window.innerHeight;
+    const aspect = 800 / 600;
+    const cssWidth = Math.floor(
+      maxWidth / aspect <= maxHeight ? maxWidth : maxHeight * aspect,
+    );
+    const cssHeight = Math.floor(cssWidth / aspect);
+
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+    canvas.width = Math.max(1, Math.floor(cssWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(cssHeight * dpr));
+    wasm.set_device_pixel_ratio(dpr);
+  };
+
+  const canvasPoint = (event: PointerEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  };
+
+  canvas.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    canvas.setPointerCapture(event.pointerId);
+    const point = canvasPoint(event);
+    wasm.on_mouse_down(point.x, point.y, event.button);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    event.preventDefault();
+    const point = canvasPoint(event);
+    wasm.on_mouse_move(point.x, point.y);
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    event.preventDefault();
+    const point = canvasPoint(event);
+    wasm.on_mouse_up(point.x, point.y, event.button);
+  });
+  canvas.addEventListener("pointercancel", (event) => {
+    event.preventDefault();
+    wasm.on_mouse_leave();
+  });
+  canvas.addEventListener("pointerleave", () => {
+    wasm.on_mouse_leave();
+  });
+
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  let last = performance.now();
+  const frame = (now: number) => {
+    const frameMs = now - last;
+    last = now;
+    if (wasm.needs_draw()) {
+      wasm.render(canvas.width, canvas.height, frameMs);
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
 }
 
 main().catch((err) => {

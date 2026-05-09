@@ -19,6 +19,8 @@ const EXCLUDED_DIRS: &[&str] = &[
     ".git",
     ".cursor",
     "target",
+    "gfg",
+    "demo/node_modules",
     "reference",
     "demo/dist",
     "demo/public/pkg",

@@ -1,5 +1,5 @@
 //! World state. Plain structs; no ECS. Mirrors the JS reference's globals
-//! in `reference/GFG/public/games/antidote/antidote.js`.
+//! in `gfg/public/games/antidote/antidote.js`.
 
 use rapier2d::prelude::RigidBodyHandle;
 

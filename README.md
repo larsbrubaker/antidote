@@ -4,7 +4,7 @@ Bubble-trap virus puzzle game in Rust — rendered with [agg-gui](https://github
 
 Held pointer grows an antidote bubble; bouncing viruses get trapped if they can't move for 3 seconds; lives, levels, and a multi-game leaderboard.
 
-> Ported from the original TypeScript / Canvas 2D / Planck.js implementation, preserved under `reference/GFG/` for reference.
+> Ported from the original TypeScript / Canvas 2D / Planck.js implementation, preserved under `gfg/` for read-only reference.
 
 ## Quick start
 
@@ -28,7 +28,7 @@ antidote-native/   # winit + wgpu shell with tokio runtime
 antidote-wasm/     # cdylib wasm-bindgen shell
 demo/              # TypeScript bundling shell for the WASM build
 db/migrations/     # Supabase Postgres schema (multi-game)
-reference/GFG/     # original TS/Canvas reference (read-only)
+gfg/               # original TS/Canvas reference (read-only; not part of builds)
 ```
 
 `antidote-core` is `wasm32`-clean — no `tokio`, no `dotenvy`. Both shells inject `Storage` and `HttpClient` impls.

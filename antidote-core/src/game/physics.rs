@@ -1,5 +1,5 @@
 //! Rapier2d-driven physics. Mirrors the body/collider parameters from the JS
-//! reference (`reference/GFG/public/games/antidote/antidote-physics.js`) so
+//! reference (`gfg/public/games/antidote/antidote-physics.js`) so
 //! gameplay feel is preserved.
 //!
 //! Body parameters (ported verbatim from the JS reference):
