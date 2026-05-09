@@ -403,6 +403,15 @@ impl PhysicsWorld {
         }
     }
 
+    /// Reset a body's linear velocity to zero. Useful in tests that teleport
+    /// a body to a known location and don't want stale velocity carrying it
+    /// back into something on the next step.
+    pub fn zero_body_velocity(&mut self, handle: RigidBodyHandle) {
+        if let Some(rb) = self.bodies.get_mut(handle) {
+            rb.set_linvel(vector![0.0, 0.0], true);
+        }
+    }
+
     /// Replace the growing-bubble's collider with a new one of the given radius.
     /// Mirrors `updateGrowingBubbleRadius` in the JS reference.
     pub fn resize_growing_bubble_collider(&mut self, handle: RigidBodyHandle, new_radius: f32) {
@@ -478,6 +487,151 @@ impl PhysicsWorld {
             if let Some(handle) = g.body {
                 clamp_body_inside(&mut self.bodies, handle, g.radius, w, h);
             }
+        }
+    }
+
+    /// Hard non-interpenetration guarantee for body↔body pairs. Like
+    /// [`Self::clamp_to_playfield`] but for circle-on-circle overlap.
+    ///
+    /// Why this is needed: rapier's velocity-based solver allows a small
+    /// amount of contact penetration as solver slack. Under the continuous
+    /// upward float force, a bubble that's pinned between another bubble
+    /// and the top wall can never fully resolve that slack — every step the
+    /// solver lets it drift a tiny bit further into its neighbours, and
+    /// over many seconds the drift accumulates into the visible "creeping
+    /// inside another bubble" symptom (and eventually past the wall edge).
+    ///
+    /// We run a Gauss-Seidel separation pass: for every pair of dynamic
+    /// circles whose centre distance is less than the sum of their radii,
+    /// push them apart along the contact normal by half the depth each and
+    /// remove the velocity component that's still pushing them together.
+    /// Then re-clamp to the playfield. Iterating this with [`Self::clamp_to_playfield`]
+    /// handles cluster cases (a bubble pushed off another bubble may then
+    /// poke through a wall, which the next clamp catches).
+    ///
+    /// Call sequence in [`crate::game::update::tick`] is:
+    /// `step → enforce_no_interpenetration → sync_to_world`.
+    pub fn enforce_no_interpenetration(&mut self, world: &World) {
+        // Snapshot every dynamic-circle handle + its radius once. Walls are
+        // static and aren't dynamic bodies in our world, so they're naturally
+        // skipped — `clamp_to_playfield` handles wall containment for us.
+        //
+        // The **growing bubble is intentionally excluded** from pair
+        // separation. Its position is teleported every frame by
+        // `set_body_position` (driven by the pointer), and its game-logic
+        // collisions (virus → life-loss, solid bubble / dead virus →
+        // solidify) are handled by `check_virus_growing_bubble_collision`
+        // and `grow_bubble`. Forcibly separating viruses from the growing
+        // bubble here would defeat both checks because the virus would be
+        // shoved out of overlap before the polling distance comparison fires.
+        let mut entities: Vec<(RigidBodyHandle, f32)> = Vec::with_capacity(
+            world.viruses.len() + world.solid_bubbles.len() + world.dead_viruses.len(),
+        );
+        for v in &world.viruses {
+            if let Some(handle) = v.body {
+                entities.push((handle, crate::consts::VIRUS_RADIUS));
+            }
+        }
+        for b in &world.solid_bubbles {
+            if let Some(handle) = b.body {
+                entities.push((handle, b.radius));
+            }
+        }
+        for d in &world.dead_viruses {
+            if let Some(handle) = d.body {
+                entities.push((handle, d.radius));
+            }
+        }
+
+        // Iterate Gauss-Seidel sweeps: separate every pair, then clamp every
+        // body back inside the playfield, then repeat. A long chain of
+        // bubbles (A pushes B, B pushes C, …) needs multiple sweeps because
+        // each pair only resolves itself, and re-clamping pushes wall-pinned
+        // bubbles back into their neighbours. 16 passes is overkill for the
+        // body counts we have but cheap enough at our scale (≤ ~30 bodies)
+        // and gives the chain plenty of time to converge.
+        const PASSES: usize = 16;
+        for _ in 0..PASSES {
+            for i in 0..entities.len() {
+                for j in (i + 1)..entities.len() {
+                    self.separate_pair(entities[i], entities[j]);
+                }
+            }
+            self.clamp_to_playfield(world);
+        }
+    }
+
+    /// Separate two circles if they overlap. Half the depth is pushed into
+    /// each body, and the relative velocity along the contact normal is
+    /// zeroed if it's still closing.
+    fn separate_pair(&mut self, a: (RigidBodyHandle, f32), b: (RigidBodyHandle, f32)) {
+        let (h_a, r_a_px) = a;
+        let (h_b, r_b_px) = b;
+
+        // Read both bodies (immutably) into locals so we can drop the borrows
+        // before mutating.
+        let (a_x, a_y, a_vx, a_vy) = match self.bodies.get(h_a) {
+            Some(rb) => {
+                let p = rb.translation();
+                let v = rb.linvel();
+                (p.x, p.y, v.x, v.y)
+            }
+            None => return,
+        };
+        let (b_x, b_y, b_vx, b_vy) = match self.bodies.get(h_b) {
+            Some(rb) => {
+                let p = rb.translation();
+                let v = rb.linvel();
+                (p.x, p.y, v.x, v.y)
+            }
+            None => return,
+        };
+
+        let r_sum = to_meters(r_a_px) + to_meters(r_b_px);
+        let dx = b_x - a_x;
+        let dy = b_y - a_y;
+        let d_sq = dx * dx + dy * dy;
+        if d_sq >= r_sum * r_sum {
+            return; // Not overlapping.
+        }
+
+        let d = d_sq.sqrt();
+        // Pick a stable normal even if centres coincide.
+        let (nx, ny) = if d > 1e-6 {
+            (dx / d, dy / d)
+        } else {
+            (1.0, 0.0)
+        };
+        let depth = r_sum - d;
+        let half = depth * 0.5;
+
+        let new_a_x = a_x - nx * half;
+        let new_a_y = a_y - ny * half;
+        let new_b_x = b_x + nx * half;
+        let new_b_y = b_y + ny * half;
+
+        // Remove the velocity component along the normal that's still
+        // closing (negative relative-velocity-along-normal means approach).
+        let vrel_n = (b_vx - a_vx) * nx + (b_vy - a_vy) * ny;
+        let (new_a_vx, new_a_vy, new_b_vx, new_b_vy) = if vrel_n < 0.0 {
+            let half_dvn = -vrel_n * 0.5;
+            (
+                a_vx - nx * half_dvn,
+                a_vy - ny * half_dvn,
+                b_vx + nx * half_dvn,
+                b_vy + ny * half_dvn,
+            )
+        } else {
+            (a_vx, a_vy, b_vx, b_vy)
+        };
+
+        if let Some(rb) = self.bodies.get_mut(h_a) {
+            rb.set_translation(vector![new_a_x, new_a_y], true);
+            rb.set_linvel(vector![new_a_vx, new_a_vy], true);
+        }
+        if let Some(rb) = self.bodies.get_mut(h_b) {
+            rb.set_translation(vector![new_b_x, new_b_y], true);
+            rb.set_linvel(vector![new_b_vx, new_b_vy], true);
         }
     }
 
@@ -611,157 +765,5 @@ impl PhysicsWorld {
                 true,
             );
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn correct_wall_slide_no_op_far_from_walls() {
-        let (vx, vy) = correct_wall_slide_velocity(400.0, 300.0, 100.0, 50.0, 800.0, 600.0);
-        assert!((vx - 100.0).abs() < 1e-4);
-        assert!((vy - 50.0).abs() < 1e-4);
-    }
-
-    #[test]
-    fn correct_wall_slide_preserves_speed_when_correcting() {
-        let (vx, vy) = correct_wall_slide_velocity(5.0, 300.0, 1.0, 100.0, 800.0, 600.0);
-        let new_speed = (vx * vx + vy * vy).sqrt();
-        let original_speed = (1.0_f32 * 1.0 + 100.0_f32 * 100.0).sqrt();
-        assert!((new_speed - original_speed).abs() < 1e-3);
-        assert!(vx > 0.0);
-    }
-
-    #[test]
-    fn world_creates_with_four_walls() {
-        let world = PhysicsWorld::new(800.0, 600.0);
-        assert_eq!(world.wall_bodies.len(), 4);
-        assert_eq!(world.bodies.len(), 4);
-        assert_eq!(world.colliders.len(), 4);
-    }
-
-    #[test]
-    fn step_runs_without_panic() {
-        let mut world = PhysicsWorld::new(800.0, 600.0);
-        world.step(1.0 / 60.0);
-        world.step(1.0 / 60.0);
-    }
-
-    /// Regression: a bubble launched at ten times its terminal speed straight
-    /// up at the wall must never exit the playfield. Mirrors the
-    /// "throws bubbles above the top of the window" symptom Lars reported —
-    /// the safety net is `clamp_to_playfield`. We sim 5 seconds at 60 Hz.
-    #[test]
-    fn bubble_never_escapes_playfield_under_extreme_velocity() {
-        use crate::game::state::{Bubble, World};
-        let mut phys = PhysicsWorld::new(800.0, 600.0);
-        let mut world = World::new();
-        // Sit the bubble two pixels below the top wall and slam upward at
-        // 1500 px/s — that's ~10× the JS reference's float-speed cap.
-        world.solid_bubbles.push(Bubble {
-            x: 400.0,
-            y: 30.0,
-            radius: 25.0,
-            vx: 0.0,
-            vy: -1500.0,
-            body: None,
-        });
-        phys.spawn_bubble_body(&mut world.solid_bubbles[0]);
-
-        for _ in 0..(5 * 60) {
-            // Mirror the gameplay tick: continuous upward float force, step,
-            // clamp, sync.
-            phys.apply_bubble_float(
-                &world,
-                crate::consts::BUBBLE_FLOAT_SPEED * 2.0,
-                crate::consts::BUBBLE_FLOAT_SPEED * 1.5,
-            );
-            phys.step(1.0 / 60.0);
-            phys.clamp_to_playfield(&world);
-            phys.sync_to_world(&mut world);
-            let b = &world.solid_bubbles[0];
-            assert!(
-                b.x >= b.radius - 0.001 && b.x <= 800.0 - b.radius + 0.001,
-                "bubble left horizontally to x={}",
-                b.x
-            );
-            assert!(
-                b.y >= b.radius - 0.001 && b.y <= 600.0 - b.radius + 0.001,
-                "bubble escaped to y={}",
-                b.y
-            );
-        }
-    }
-
-    #[test]
-    fn virus_spawn_step_sync_round_trip() {
-        let mut phys = PhysicsWorld::new(800.0, 600.0);
-        let mut world = World::new();
-        world.viruses.push(Virus {
-            x: 200.0,
-            y: 300.0,
-            vx: 100.0,
-            vy: 0.0,
-            phase: 0.0,
-            last_unstuck_x: 200.0,
-            last_unstuck_y: 300.0,
-            stuck_time: 0.0,
-            speed: 100.0,
-            body: None,
-        });
-        let radius = crate::consts::VIRUS_RADIUS;
-        phys.spawn_virus_body(&mut world.viruses[0], radius);
-        assert!(world.viruses[0].body.is_some());
-
-        // Step a few frames; virus should move right (positive vx).
-        for _ in 0..30 {
-            phys.step(1.0 / 60.0);
-        }
-        phys.sync_to_world(&mut world);
-        assert!(world.viruses[0].x > 200.0, "virus did not move right");
-    }
-
-    #[test]
-    fn virus_collision_pushes_solid_bubble() {
-        let mut phys = PhysicsWorld::new(800.0, 600.0);
-        let mut world = World::new();
-
-        world.solid_bubbles.push(Bubble {
-            x: 300.0,
-            y: 300.0,
-            radius: 30.0,
-            vx: 0.0,
-            vy: 0.0,
-            body: None,
-        });
-        phys.spawn_bubble_body(&mut world.solid_bubbles[0]);
-
-        world.viruses.push(Virus {
-            x: 240.0,
-            y: 300.0,
-            vx: 120.0,
-            vy: 0.0,
-            phase: 0.0,
-            last_unstuck_x: 240.0,
-            last_unstuck_y: 300.0,
-            stuck_time: 0.0,
-            speed: 120.0,
-            body: None,
-        });
-        phys.spawn_virus_body(&mut world.viruses[0], crate::consts::VIRUS_RADIUS);
-
-        for _ in 0..45 {
-            phys.step(1.0 / 60.0);
-            phys.sync_to_world(&mut world);
-            phys.maintain_virus_speeds(&mut world, 120.0);
-        }
-
-        assert!(
-            world.solid_bubbles[0].x > 302.0,
-            "virus did not transfer visible momentum to bubble: x={}",
-            world.solid_bubbles[0].x
-        );
     }
 }

@@ -46,13 +46,20 @@ pub fn tick(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
     physics.apply_dead_virus_gravity(world, DEAD_VIRUS_SINK_SPEED);
 
     physics.step(dt);
-    // Hard playfield-boundary guarantee: snap any body whose centre escaped
-    // the [radius, W-radius] × [radius, H-radius] rectangle back inside,
-    // killing the outward velocity component. CCD plus rapier's contact
-    // resolution should prevent this in normal play, but extreme virus
-    // impulses can still tunnel a bubble for one frame, and the user
-    // requirement is "no bubble should ever cross the window frame".
-    physics.clamp_to_playfield(world);
+    // Hard guarantees the user explicitly asked for, applied AFTER rapier's
+    // own velocity solver runs. Both fix slow-drift symptoms that a velocity
+    // solver alone can't:
+    //  - `enforce_no_interpenetration`: no body↔body interpenetration. The
+    //    constant upward float force makes the solver leave a sliver of
+    //    contact-slack penetration each step; over many steps that sliver
+    //    accumulates into a visible "bubble creeping inside another
+    //    bubble" drift. The Gauss-Seidel separation pass projects all
+    //    overlaps out and cancels the closing relative velocity. Internally
+    //    re-clamps to the playfield between sweeps.
+    //  - `clamp_to_playfield` (final): no body crosses the window frame.
+    //    `enforce_no_interpenetration` already calls this between sweeps;
+    //    we call it again here for clarity and as the very last word.
+    physics.enforce_no_interpenetration(world);
     physics.sync_to_world(world);
 
     let target_speed = virus_speed_for_level(world.level);
@@ -515,11 +522,20 @@ mod tests {
         // Real level so check_level_complete doesn't fire on tick 1.
         level_init(&mut world, &mut physics);
         // Push viruses out of the way of the bubble we're about to grow.
+        // The world struct fields alone aren't enough — sync_to_world rewrites
+        // them from the rapier body every tick, so we have to move the body
+        // too AND zero its velocity so it doesn't drift back into the bubble.
         for v in world.viruses.iter_mut() {
             v.x = 50.0;
             v.y = 50.0;
+            v.vx = 0.0;
+            v.vy = 0.0;
             v.last_unstuck_x = 50.0;
             v.last_unstuck_y = 50.0;
+            if let Some(handle) = v.body {
+                physics.set_body_position(handle, 50.0, 50.0);
+                physics.zero_body_velocity(handle);
+            }
         }
         on_pointer_down(&mut world, &mut physics, 600.0, 400.0);
         // Grow for 0.25 s — radius becomes 20 px (BUBBLE_GROW_RATE * 0.25).

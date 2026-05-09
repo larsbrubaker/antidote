@@ -4,3 +4,6 @@ pub mod physics;
 pub mod state;
 pub mod timestep;
 pub mod update;
+
+#[cfg(test)]
+mod physics_tests;
