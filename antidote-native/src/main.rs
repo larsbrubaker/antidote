@@ -62,13 +62,11 @@ fn main() {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
-            } => {
-                if size.width > 0 && size.height > 0 {
-                    win_w = size.width;
-                    win_h = size.height;
-                    framebuffer.resize(win_w, win_h);
-                    window.request_redraw();
-                }
+            } if size.width > 0 && size.height > 0 => {
+                win_w = size.width;
+                win_h = size.height;
+                framebuffer.resize(win_w, win_h);
+                window.request_redraw();
             }
 
             Event::WindowEvent {
