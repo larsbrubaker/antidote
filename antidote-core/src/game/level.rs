@@ -29,6 +29,8 @@ pub fn init_level(world: &mut World, physics: &mut PhysicsWorld) {
     world.total_antidote_time = total_antidote_time_for(world.level);
     world.antidote = 1.0;
     world.phase = Phase::Playing;
+    world.level_start_score = world.total_score;
+    world.last_life_lost_at = None;
 
     spawn_viruses(world, physics, virus_count_for_level(world.level));
 }

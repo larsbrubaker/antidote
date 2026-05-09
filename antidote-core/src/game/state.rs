@@ -126,6 +126,14 @@ pub struct World {
     /// Used so we don't tear down + rebuild the rapier collider every frame
     /// for a tiny radius bump.
     pub last_grown_collider_radius: f32,
+    /// `total_score` snapshot at the start of the current level. The
+    /// LevelComplete overlay subtracts this from `total_score` to show how
+    /// many points were earned this level.
+    pub level_start_score: u64,
+    /// Where the growing bubble was popped when the player last lost a life
+    /// (JS-style logical coords). The LifeLost overlay anchors its float-up
+    /// animation here.
+    pub last_life_lost_at: Option<(f32, f32)>,
 }
 
 impl World {
@@ -149,7 +157,14 @@ impl World {
             phase_elapsed: 0.0,
             slide_out_charged: false,
             last_grown_collider_radius: 0.0,
+            level_start_score: 0,
+            last_life_lost_at: None,
         }
+    }
+
+    /// Score earned in the level currently in progress (or just completed).
+    pub fn current_level_score(&self) -> u64 {
+        self.total_score.saturating_sub(self.level_start_score)
     }
 }
 

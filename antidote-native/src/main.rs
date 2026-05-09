@@ -124,6 +124,12 @@ fn main() {
             .expect("create window"),
     );
     agg_gui::set_device_scale(window.scale_factor());
+    // Enable LCD subpixel text rendering on standard-DPI displays (matches
+    // agg-gui's demo default). Without this `set_lcd_mode(false)` is forced
+    // every frame and `fill_text` falls back to the grayscale outline path,
+    // which emits `DrawCommand::Solid` (no AA halo) — producing the chunky
+    // text the user reported.
+    agg_gui::font_settings::set_lcd_enabled(agg_gui::device_scale() <= 1.25);
 
     let mut gpu = Gpu::new(window.clone());
 

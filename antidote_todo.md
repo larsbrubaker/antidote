@@ -95,14 +95,18 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 
 **Goal:** the gameplay loop has real beginning / middle / end states, not just an infinite single-level grind.
 
+**Status:** Done in shape, awaiting Phase 3 to fill in the main-menu placeholders and any visual polish on the life-lost float.
+
 **Sub-steps:**
 
-1. **Main menu** — sign-in panel + "Play" button + "Other games" panel + leaderboard for the current user.
-2. **Pause overlay** — Esc / P key toggles Phase::Playing ↔ Phase::Paused. Resume button + back-to-menu button.
-3. **Game-over screen** — final score, "Play again" + back-to-menu, plus an upsert if the user is signed in.
-4. **Level-complete screen** — short pause showing score gained + "Next level" button.
-5. **Life-lost animation** — JS reference floats the new lives counter from canvas center to the HUD lives icon. The shared game-state transition is now ported: `LifeLost` holds for 1.2 s, then restarts the level or enters `GameOver`. Remaining work: visual floating-lives overlay via `antidote-core::ui::menu_widget` + agg-gui transient overlay support.
-6. **HUD as a real widget tree** — currently the HUD is drawn inside the GameWidget paint. Split into a top bar widget for lives + level + antidote bar + score that lays out around the game widget.
+1. **Done — Main menu.** `MainMenuOverlay` ([`antidote-core/src/ui/menu_widget.rs`](antidote-core/src/ui/menu_widget.rs)) shows a Play button plus disabled placeholder rows for sign-in / leaderboard / other-games. Placeholders stay visible-but-disabled so the menu has the right shape when Phase 3 fills them in.
+2. **Done — Pause overlay.** `PauseOverlay` toggles via the `App::set_global_key_handler` Esc/P binding wired in [`antidote-core/src/ui/mod.rs`](antidote-core/src/ui/mod.rs). Physics already pauses on `Phase::Paused` thanks to the existing tick guard.
+3. **Done — Game-over screen.** `GameOverOverlay` shows the final score with Play-again / Back-to-menu buttons. Play-again calls the existing `update::start_new_game` helper. *Sign-in upsert* is deferred until Phase 3.
+4. **Done — Level-complete screen.** `LevelCompleteOverlay` shows the score earned this level (computed from a new `World::level_start_score` snapshot) plus a Next-level button. Next calls `update::advance_to_next_level`.
+5. **Done — Life-lost float.** `LifeLostOverlay` ([`antidote-core/src/ui/life_lost_overlay.rs`](antidote-core/src/ui/life_lost_overlay.rs)) animates a "−1" disc from the death position to the HUD lives slot during the 1.2 s `Phase::LifeLost` window. Death position now captured into `World::last_life_lost_at`.
+6. **Done — HUD as a widget.** `HudWidget` ([`antidote-core/src/ui/hud_widget.rs`](antidote-core/src/ui/hud_widget.rs)) is the new top bar: lives, level, antidote bar (color shifts green→red as antidote drains), score. Z-stacked above the game canvas in `OverlayStack` ([`antidote-core/src/ui/overlay_stack.rs`](antidote-core/src/ui/overlay_stack.rs)). Hit-test limited to the top-bar zone so clicks below pass through to the canvas. The old `paint_hud` stub is removed.
+
+**Architecture note:** `GameWidget` no longer owns the world directly — it reads from `GameModel` ([`antidote-core/src/ui/game_model.rs`](antidote-core/src/ui/game_model.rs)), an `Rc<RefCell<…>>` shared with the HUD and every overlay. Buttons mutate phase + world via this shared handle.
 
 ---
 

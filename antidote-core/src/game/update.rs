@@ -416,10 +416,12 @@ fn check_virus_growing_bubble_collision(world: &mut World, physics: &mut Physics
     });
     if hit {
         // Pop the bubble (no solidify) and lose a life.
+        let mut death_xy = (g_x, g_y);
         if let Some(g) = world.growing.take() {
             if let Some(h) = g.body {
                 physics.destroy_body(h);
             }
+            death_xy = (g.x, g.y);
             world.pop_animations.push(PopAnimation {
                 x: g.x,
                 y: g.y,
@@ -432,6 +434,7 @@ fn check_virus_growing_bubble_collision(world: &mut World, physics: &mut Physics
         }
         world.phase = Phase::LifeLost;
         world.phase_elapsed = 0.0;
+        world.last_life_lost_at = Some(death_xy);
     }
 }
 

@@ -238,6 +238,9 @@ pub fn render(width: u32, height: u32, _frame_ms: f64) {
 #[wasm_bindgen]
 pub fn set_device_pixel_ratio(dpr: f64) {
     agg_gui::set_device_scale(dpr.max(0.5));
+    // Mirror the native shell — LCD subpixel text rendering on standard-DPI
+    // displays. Without this, the grayscale outline path emits non-AA text.
+    agg_gui::font_settings::set_lcd_enabled(agg_gui::device_scale() <= 1.25);
     mark_dirty();
 }
 

@@ -1,42 +1,28 @@
-//! `GameWidget` — the 800×600 letterboxed play area.
+//! `GameWidget` — the 800×600 letterboxed play area. Reads + mutates the
+//! shared [`GameModel`] each frame; never owns the world directly.
 
 use agg_gui::geometry::Size;
 use agg_gui::{DrawCtx, Event, EventResult, MouseButton, Point, Rect, Widget};
 use web_time::Instant;
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
-use crate::game::physics::PhysicsWorld;
-use crate::game::state::World;
-use crate::game::timestep::{FixedTimestep, FIXED_DT};
+use crate::game::timestep::FIXED_DT;
 use crate::game::update;
 use crate::render::scene;
+use crate::ui::game_model::SharedModel;
 
 pub struct GameWidget {
     bounds: Rect,
     children: Vec<Box<dyn Widget>>,
-    pub world: World,
-    pub physics: PhysicsWorld,
-    /// Wall-clock start; used to compute a monotonic time for animations.
-    epoch: Instant,
-    /// Last `paint` time; only used to feed elapsed wall-time into the fixed
-    /// timestep accumulator. Simulation itself always runs at 60 Hz.
-    last_paint: Option<Instant>,
-    timestep: FixedTimestep,
+    model: SharedModel,
 }
 
 impl GameWidget {
-    pub fn new() -> Self {
-        let mut world = World::new();
-        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-        crate::game::level::init_level(&mut world, &mut physics);
+    pub fn new(model: SharedModel) -> Self {
         Self {
             bounds: Rect::new(0.0, 0.0, VIRTUAL_WIDTH as f64, VIRTUAL_HEIGHT as f64),
             children: Vec::new(),
-            world,
-            physics,
-            epoch: Instant::now(),
-            last_paint: None,
-            timestep: FixedTimestep::new(),
+            model,
         }
     }
 
@@ -89,13 +75,11 @@ struct Letterbox {
     game_h: f32,
 }
 
-impl Default for GameWidget {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Widget for GameWidget {
+    fn type_name(&self) -> &'static str {
+        "GameWidget"
+    }
+
     fn bounds(&self) -> Rect {
         self.bounds
     }
@@ -118,20 +102,23 @@ impl Widget for GameWidget {
     }
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
+        let mut model = self.model.borrow_mut();
         let now = Instant::now();
-        let elapsed = match self.last_paint {
+        let elapsed = match model.last_paint {
             Some(prev) => (now - prev).as_secs_f32(),
             None => FIXED_DT,
         };
-        self.last_paint = Some(now);
+        model.last_paint = Some(now);
 
-        let batch = self.timestep.advance(elapsed);
+        let batch = model.timestep.advance(elapsed);
         for _ in 0..batch.steps {
-            update::tick(&mut self.world, &mut self.physics, batch.dt);
+            let dt = batch.dt;
+            let m = &mut *model;
+            update::tick(&mut m.world, &mut m.physics, dt);
         }
 
         let lb = self.letterbox();
-        let time_seconds = self.epoch.elapsed().as_secs_f32();
+        let time_seconds = model.epoch.elapsed().as_secs_f32();
 
         ctx.save();
         // Map JS Y-down logical (0..W, 0..H) → widget Y-up letterboxed pixels.
@@ -142,22 +129,23 @@ impl Widget for GameWidget {
         scene::paint_background_and_grid(ctx);
         scene::paint_border(ctx);
 
-        for b in &self.world.solid_bubbles {
+        let world = &model.world;
+        for b in &world.solid_bubbles {
             scene::paint_bubble(ctx, b, false);
         }
-        for d in &self.world.dead_viruses {
+        for d in &world.dead_viruses {
             scene::paint_dead_virus(ctx, d);
         }
-        for d in &self.world.dying_viruses {
+        for d in &world.dying_viruses {
             scene::paint_dying_virus(ctx, d, time_seconds);
         }
-        if let Some(g) = &self.world.growing {
+        if let Some(g) = &world.growing {
             scene::paint_growing_bubble(ctx, g);
         }
-        for v in &self.world.viruses {
+        for v in &world.viruses {
             scene::paint_virus(ctx, v, time_seconds);
         }
-        for p in &self.world.pop_animations {
+        for p in &world.pop_animations {
             scene::paint_pop_animation(ctx, p);
         }
 
@@ -172,20 +160,25 @@ impl Widget for GameWidget {
                 ..
             } => {
                 if let Some((x, y)) = self.event_to_logical(*pos) {
-                    update::on_pointer_down(&mut self.world, &mut self.physics, x, y);
+                    let mut model = self.model.borrow_mut();
+                    let m = &mut *model;
+                    update::on_pointer_down(&mut m.world, &mut m.physics, x, y);
                     return EventResult::Consumed;
                 }
             }
             Event::MouseMove { pos } => {
                 if let Some((x, y)) = self.event_to_logical(*pos) {
-                    update::on_pointer_move(&mut self.world, x, y);
+                    let mut model = self.model.borrow_mut();
+                    update::on_pointer_move(&mut model.world, x, y);
                 }
             }
             Event::MouseUp {
                 button: MouseButton::Left,
                 ..
             } => {
-                update::on_pointer_up(&mut self.world, &mut self.physics);
+                let mut model = self.model.borrow_mut();
+                let m = &mut *model;
+                update::on_pointer_up(&mut m.world, &mut m.physics);
                 return EventResult::Consumed;
             }
             _ => {}
