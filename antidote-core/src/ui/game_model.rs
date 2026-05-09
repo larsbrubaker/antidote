@@ -23,7 +23,7 @@ use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::db::auth::AuthClient;
 use crate::db::client::PostgrestClient;
 use crate::db::inbox::{DbInbox, Session};
-use crate::db::models::{Game, UserScore};
+use crate::db::models::{Game, LeaderboardEntry};
 use crate::game::physics::PhysicsWorld;
 use crate::game::state::{Phase, World};
 use agg_gui::timestep::FixedTimestep;
@@ -112,7 +112,7 @@ pub struct MenuCaches {
     pub games: Option<Vec<Game>>,
     pub games_error: Option<String>,
     pub games_pending: bool,
-    pub top_scores: Option<Vec<UserScore>>,
+    pub top_scores: Option<Vec<LeaderboardEntry>>,
     pub top_scores_error: Option<String>,
     pub top_scores_pending: bool,
 }

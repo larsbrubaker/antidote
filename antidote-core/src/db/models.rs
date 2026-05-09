@@ -1,5 +1,18 @@
 use serde::{Deserialize, Serialize};
 
+/// One row of the public `leaderboard` view. The view hides `user_id` UUIDs
+/// behind the per-user `handle` chosen at signup; see
+/// `db/migrations/0004_handles_and_leaderboard_view.sql`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaderboardEntry {
+    pub game_slug: String,
+    pub handle: String,
+    pub high_score: i32,
+    pub total_score: i64,
+    pub plays: i32,
+    pub last_played: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     pub id: String,

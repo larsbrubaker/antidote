@@ -5,7 +5,7 @@
 //! come through as `Err(String)` so the UI can show them verbatim.
 
 use crate::db::inbox::{DbInbox, DbInboxEvent};
-use crate::db::models::{Game, UserScore};
+use crate::db::models::{Game, LeaderboardEntry, UserScore};
 
 pub struct PostgrestClient {
     pub base_url: String,
@@ -41,17 +41,19 @@ impl PostgrestClient {
         });
     }
 
-    /// `GET /rest/v1/user_scores?game_id=eq.<id>&order=high_score.desc&limit=<n>`.
-    /// Result lands on `inbox.rx` as `DbInboxEvent::TopScoresList`.
-    pub fn top_scores_for_game_async(&self, game_id: &str, limit: u32, inbox: &DbInbox) {
+    /// `GET /rest/v1/leaderboard?game_slug=eq.<slug>&order=high_score.desc&limit=<n>`.
+    /// Reads the public `leaderboard` view added in migration 0004 — exposes
+    /// `handle` instead of `user_id`. Result lands on `inbox.rx` as
+    /// `DbInboxEvent::TopScoresList`.
+    pub fn top_leaderboard_async(&self, game_slug: &str, limit: u32, inbox: &DbInbox) {
         let url = format!(
-            "{}/rest/v1/user_scores?select=*&game_id=eq.{}&order=high_score.desc&limit={}",
-            self.base_url, game_id, limit
+            "{}/rest/v1/leaderboard?select=*&game_slug=eq.{}&order=high_score.desc&limit={}",
+            self.base_url, game_slug, limit
         );
         let req = self.get_request(url);
         let tx = inbox.tx.clone();
         ehttp::fetch(req, move |result| {
-            let event = DbInboxEvent::TopScoresList(parse_json_array::<UserScore>(result));
+            let event = DbInboxEvent::TopScoresList(parse_json_array::<LeaderboardEntry>(result));
             let _ = tx.send(event);
         });
     }

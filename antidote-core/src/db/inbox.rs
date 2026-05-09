@@ -15,7 +15,7 @@
 use flume::{Receiver, Sender};
 use serde::{Deserialize, Serialize};
 
-use crate::db::models::{Game, UserScore};
+use crate::db::models::{Game, LeaderboardEntry};
 
 /// One inbound event from the Supabase REST layer back to the UI.
 ///
@@ -32,8 +32,10 @@ pub enum DbInboxEvent {
     SignUpResult(Result<Session, String>),
     /// Catalog snapshot from `GET /rest/v1/games?select=*`.
     GamesList(Result<Vec<Game>, String>),
-    /// Top-N rows from `GET /rest/v1/user_scores?game_id=eq.<id>&order=high_score.desc`.
-    TopScoresList(Result<Vec<UserScore>, String>),
+    /// Top-N rows from `GET /rest/v1/leaderboard?game_slug=eq.<slug>&order=high_score.desc`.
+    /// Each row is a [`LeaderboardEntry`] with the user's `handle` instead
+    /// of their `user_id` UUID — see migration 0004.
+    TopScoresList(Result<Vec<LeaderboardEntry>, String>),
 }
 
 /// Persisted Supabase session — lives in [`SharedModel`] for as long as the

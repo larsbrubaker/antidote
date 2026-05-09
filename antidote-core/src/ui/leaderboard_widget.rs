@@ -15,7 +15,7 @@ use agg_gui::text::Font;
 use agg_gui::widgets::label::{Label, LabelAlign};
 use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
-use crate::db::models::UserScore;
+use crate::db::models::LeaderboardEntry;
 use crate::game::state::Phase;
 use crate::ui::game_model::{MenuView, SharedModel};
 use crate::ui::menu_widget::{
@@ -86,34 +86,13 @@ impl LeaderboardOverlay {
         let mut m = self.model.borrow_mut();
         m.menu_caches.top_scores_pending = true;
         m.menu_caches.top_scores_error = None;
-        // No `game_id` yet — leaderboard needs the games-table row to know
-        // which UUID to filter on. We piggyback on the games-list cache:
-        // if it isn't populated yet, kick that off too. Once games loads,
-        // a subsequent layout pass picks the right row and dispatches the
-        // scoped score query.
-        if let Some(games) = m.menu_caches.games.as_ref() {
-            if let Some(row) = games.iter().find(|g| g.slug == m.services.config.game_slug) {
-                let game_id = row.id.clone();
-                m.services.postgrest.top_scores_for_game_async(
-                    &game_id,
-                    MAX_ROWS as u32,
-                    &m.services.inbox,
-                );
-                return;
-            }
-        }
-        // Games list not populated yet — fetch it; next refresh will see
-        // the cache and dispatch the score query.
-        if !m.menu_caches.games_pending && m.menu_caches.games.is_none() {
-            m.menu_caches.games_pending = true;
-            m.services.postgrest.list_games_async(&m.services.inbox);
-        }
-        // Drop the pending flag for top_scores so refresh tries again next
-        // frame once games is in.
-        m.menu_caches.top_scores_pending = false;
+        let slug = m.services.config.game_slug.clone();
+        m.services
+            .postgrest
+            .top_leaderboard_async(&slug, MAX_ROWS as u32, &m.services.inbox);
     }
 
-    fn rebuild_rows(&mut self, scores: Option<&[UserScore]>, error: Option<&str>) {
+    fn rebuild_rows(&mut self, scores: Option<&[LeaderboardEntry]>, error: Option<&str>) {
         let back_model = self.model.clone();
         let mut new_children: Vec<Box<dyn Widget>> = Vec::with_capacity(MAX_ROWS + 4);
         new_children.push(header_label("Leaderboard", self.font.clone(), 30.0));
@@ -135,9 +114,7 @@ impl LeaderboardOverlay {
             }
             (Some(rows), _) => {
                 for (i, row) in rows.iter().take(MAX_ROWS).enumerate() {
-                    let mut short_id = row.user_id.clone();
-                    short_id.truncate(8);
-                    let line = format!("{:>2}. {}…  {}", i + 1, short_id, row.high_score);
+                    let line = format!("{:>2}. {:<20} {}", i + 1, row.handle, row.high_score);
                     new_children.push(Box::new(
                         Label::new(line, self.font.clone())
                             .with_font_size(15.0)
