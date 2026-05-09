@@ -8,6 +8,8 @@
     "build": "vite build"
   },
   "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.7",
     "vite": "^5"
   }
 }
