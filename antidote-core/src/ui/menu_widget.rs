@@ -120,9 +120,11 @@ pub fn secondary_button(
 }
 
 /// Reset world to a fresh "level 1, full lives, zero score" state without
-/// leaking rapier bodies.
+/// leaking rapier bodies. Also resets the score-sync tracker so the next
+/// `LevelComplete` / `GameOver` records the full new session.
 fn reset_to_start(model: &SharedModel) {
     let mut m = model.borrow_mut();
+    m.reset_score_sync();
     let m = &mut *m;
     m.physics = crate::game::physics::PhysicsWorld::new(
         crate::consts::VIRTUAL_WIDTH,
@@ -155,6 +157,7 @@ impl MainMenuOverlay {
             ),
             primary_button("Play", font.clone(), move || {
                 let mut m = play_model.borrow_mut();
+                m.reset_score_sync();
                 let m = &mut *m;
                 update::start_new_game(&mut m.world, &mut m.physics);
             }),
@@ -425,6 +428,7 @@ impl GameOverOverlay {
             body_label("Final score: 0", font.clone(), None),
             primary_button("Play again", font.clone(), move || {
                 let mut m = again_model.borrow_mut();
+                m.reset_score_sync();
                 let m = &mut *m;
                 update::start_new_game(&mut m.world, &mut m.physics);
             }),

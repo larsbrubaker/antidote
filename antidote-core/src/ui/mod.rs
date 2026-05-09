@@ -97,6 +97,54 @@ pub fn build_antidote_app_with_config(config: SupabaseConfig) -> App {
     app
 }
 
+/// Push the current session's score to Supabase if the player just
+/// finished a level or ran out of lives. Idempotent: tracks
+/// `last_phase` + `last_synced_session_score` so the network call fires
+/// exactly once per finalize transition, and only when the cumulative
+/// session score has grown since the last sync.
+///
+/// Call once per frame, after `drain_db_inbox`, so the function sees the
+/// freshest auth state (in case sign-in just landed). Cheap when not
+/// signed in or when no transition occurred.
+pub fn tick_score_sync(model: &SharedModel) {
+    let mut m = model.borrow_mut();
+
+    let phase = m.world.phase;
+    let prev_phase = m.score_sync.last_phase;
+    m.score_sync.last_phase = Some(phase);
+
+    // Only act on the transition INTO LevelComplete or GameOver.
+    let is_finalize = matches!(phase, Phase::LevelComplete | Phase::GameOver);
+    let just_entered = is_finalize && prev_phase != Some(phase);
+    if !just_entered {
+        return;
+    }
+    if m.auth.session.is_none() {
+        return;
+    }
+
+    let total_score = m.world.total_score;
+    let already_synced = m.score_sync.last_synced_session_score;
+    if total_score <= already_synced {
+        return;
+    }
+    let delta = (total_score - already_synced) as i32;
+
+    // Need a known game_id to call the RPC. If we don't have the games
+    // catalog cached yet, fetch it now; we'll retry on the next finalize
+    // (a future GameOver, etc.).
+    let Some(game_id) = m.cached_game_id() else {
+        if !m.menu_caches.games_pending && m.menu_caches.games.is_none() {
+            m.menu_caches.games_pending = true;
+            m.services.postgrest.list_games_async(&m.services.inbox);
+        }
+        return;
+    };
+
+    m.services.postgrest.add_game_score_async(&game_id, delta);
+    m.score_sync.last_synced_session_score = total_score;
+}
+
 /// Drain queued REST responses from the db inbox into the shared model.
 /// Call once per frame from the platform shell (or from a low-stack widget
 /// that is guaranteed to paint every frame). Idempotent and cheap when the
@@ -126,6 +174,14 @@ pub fn drain_db_inbox(model: &SharedModel) {
                 // they see their email + Sign-out button.
                 m.menu_view = MenuView::Main;
                 // Future: persist via `Storage::save_session(&s)`.
+                // Pre-fetch the games catalog so `tick_score_sync` and the
+                // leaderboard / other-games overlays don't have to wait
+                // for an extra round-trip when the player first reaches a
+                // level-complete or opens those panels.
+                if m.menu_caches.games.is_none() && !m.menu_caches.games_pending {
+                    m.menu_caches.games_pending = true;
+                    m.services.postgrest.list_games_async(&m.services.inbox);
+                }
             }
             DbInboxEvent::SignInResult(Err(err)) | DbInboxEvent::SignUpResult(Err(err)) => {
                 m.auth.record_error(err);

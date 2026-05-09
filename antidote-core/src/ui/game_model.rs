@@ -25,8 +25,8 @@ use crate::db::client::PostgrestClient;
 use crate::db::inbox::{DbInbox, Session};
 use crate::db::models::{Game, UserScore};
 use crate::game::physics::PhysicsWorld;
-use crate::game::state::World;
-use crate::game::timestep::FixedTimestep;
+use crate::game::state::{Phase, World};
+use agg_gui::timestep::FixedTimestep;
 
 /// Supabase project identity. Both shells construct this from environment /
 /// runtime-config.json and hand it to [`build_antidote_app`].
@@ -139,6 +139,21 @@ impl AppServices {
     }
 }
 
+/// Per-session state for the score-sync logic. Tracks how much of the
+/// current play session has already been pushed to Supabase via the
+/// `add_game_score` RPC, so a single tick of `LevelComplete` only fires
+/// one network call. Reset on `start_new_game` (or any other phase reset
+/// back to a fresh session).
+#[derive(Default)]
+pub struct ScoreSyncState {
+    /// Cumulative session score we've already sent to the server. Used
+    /// to compute the per-flush delta.
+    pub last_synced_session_score: u64,
+    /// `world.phase` from the previous frame. Used to detect the
+    /// transition into `LevelComplete` / `GameOver` exactly once.
+    pub last_phase: Option<Phase>,
+}
+
 /// Owning state for the running game. Held inside [`SharedModel`].
 pub struct GameModel {
     pub world: World,
@@ -154,6 +169,7 @@ pub struct GameModel {
     pub auth: AuthState,
     pub menu_view: MenuView,
     pub menu_caches: MenuCaches,
+    pub score_sync: ScoreSyncState,
 }
 
 impl GameModel {
@@ -168,7 +184,30 @@ impl GameModel {
             auth: AuthState::default(),
             menu_view: MenuView::Main,
             menu_caches: MenuCaches::default(),
+            score_sync: ScoreSyncState::default(),
         }
+    }
+
+    /// Look up the UUID of the games-table row that corresponds to this
+    /// game (i.e. `slug == services.config.game_slug`). Returns `None` if
+    /// the games catalog hasn't been fetched yet, or if the catalog doesn't
+    /// contain a matching row. Cheap; the catalog is normally tiny.
+    pub fn cached_game_id(&self) -> Option<String> {
+        let slug = &self.services.config.game_slug;
+        self.menu_caches
+            .games
+            .as_ref()?
+            .iter()
+            .find(|g| &g.slug == slug)
+            .map(|g| g.id.clone())
+    }
+
+    /// Reset score-sync state at the start of a fresh play session so the
+    /// next `LevelComplete` / `GameOver` records the full session score.
+    /// Call from button handlers that reset the world (`Play`, `Play again`,
+    /// `Back to menu`).
+    pub fn reset_score_sync(&mut self) {
+        self.score_sync = ScoreSyncState::default();
     }
 }
 

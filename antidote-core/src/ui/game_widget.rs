@@ -6,7 +6,7 @@ use agg_gui::{DrawCtx, Event, EventResult, MouseButton, Point, Rect, Widget};
 use web_time::Instant;
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
-use crate::game::timestep::FIXED_DT;
+use agg_gui::timestep::FIXED_DT;
 use crate::game::update;
 use crate::render::scene;
 use crate::ui::game_model::SharedModel;
@@ -109,8 +109,10 @@ impl Widget for GameWidget {
         // GameWidget is the lowest-z child of the OverlayStack root, so its
         // paint runs every frame regardless of phase. Drain any REST inbox
         // events here so the rest of the tree sees up-to-date auth / cache
-        // state in their own paints later in the frame.
+        // state in their own paints later in the frame, then push score
+        // updates if the player just finalized a level or game.
         crate::ui::drain_db_inbox(&self.model);
+        crate::ui::tick_score_sync(&self.model);
 
         let mut model = self.model.borrow_mut();
         let now = Instant::now();

@@ -56,6 +56,36 @@ impl PostgrestClient {
         });
     }
 
+    /// Atomic per-session score upsert, server-side. Calls the
+    /// `public.add_game_score(p_game_id, p_session_score)` RPC defined in
+    /// `db/migrations/0003_achievements_and_triggers.sql`. The function
+    /// uses `auth.uid()` so the caller can't write a row for another user;
+    /// `security definer` lets it merge max(high_score) / accumulate
+    /// total_score / +1 plays in a single transaction without a round-trip
+    /// read.
+    ///
+    /// `session_score` is the points earned in *this* play session — the
+    /// function adds it to the stored `total_score` and replaces
+    /// `high_score` only if the new value is higher. Pass the cumulative
+    /// score for the session, not a delta from the previous level.
+    pub fn add_game_score_async(&self, game_id: &str, session_score: i32) {
+        let url = format!("{}/rest/v1/rpc/add_game_score", self.base_url);
+        let body = serde_json::json!({
+            "p_game_id": game_id,
+            "p_session_score": session_score,
+        });
+        let body_bytes = serde_json::to_vec(&body).unwrap_or_default();
+        let mut req = ehttp::Request::post(url, body_bytes);
+        self.add_auth_headers(&mut req);
+        req.headers
+            .insert("Content-Type".to_owned(), "application/json".to_owned());
+        // `Prefer: return=minimal` so the response body is empty (we don't
+        // need it); the function returns void anyway.
+        req.headers
+            .insert("Prefer".to_owned(), "return=minimal".to_owned());
+        ehttp::fetch(req, |_| {});
+    }
+
     /// Fire-and-forget upsert of the running player's score row. We don't
     /// surface a UI confirmation right now, just log on failure.
     /// `PATCH-with-Prefer: resolution=merge-duplicates` semantics; we pass

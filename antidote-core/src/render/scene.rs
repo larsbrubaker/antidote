@@ -6,8 +6,8 @@
 //! 0..VIRTUAL_HEIGHT) JS-down logical box into the widget's letterboxed Y-up
 //! pixel area, so every helper below works in JS coordinates.
 
-use agg_gui::draw_ctx::{GradientSpread, GradientStop, RadialGradientPaint};
-use agg_gui::{Color, DrawCtx, TransAffine};
+use agg_gui::draw_ctx::RadialGradientPaint;
+use agg_gui::{Color, DrawCtx};
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::state::{
@@ -17,18 +17,6 @@ use crate::game::state::{
 #[inline]
 pub fn flip_y(y: f32) -> f32 {
     VIRTUAL_HEIGHT - y
-}
-
-/// `rgba(r, g, b, a)` from CSS-style 8-bit RGB + 0..1 alpha.
-#[inline]
-fn css_rgba(r: u8, g: u8, b: u8, a: f32) -> Color {
-    Color::rgba(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a)
-}
-
-/// `#RRGGBB` literal at full alpha.
-#[inline]
-fn hex(r: u8, g: u8, b: u8) -> Color {
-    css_rgba(r, g, b, 1.0)
 }
 
 const GAME_W: f64 = VIRTUAL_WIDTH as f64;
@@ -48,13 +36,13 @@ pub fn paint_scene(world: &World, _time_seconds: f32) {
 /// `rgba(0, 255, 242, 0.05)` lineWidth 1.
 pub fn paint_background_and_grid(ctx: &mut dyn DrawCtx) {
     // Background
-    ctx.set_fill_color(hex(5, 5, 8));
+    ctx.set_fill_color(Color::from_rgb8(5, 5, 8));
     ctx.begin_path();
     ctx.rect(0.0, 0.0, GAME_W, GAME_H);
     ctx.fill();
 
     // Grid lines (cyan, 5% alpha, 1 px)
-    ctx.set_stroke_color(css_rgba(0, 255, 242, 0.05));
+    ctx.set_stroke_color(Color::from_rgb8(0, 255, 242).with_alpha(0.05));
     ctx.set_line_width(1.0);
     let step = 30.0_f64;
 
@@ -78,7 +66,7 @@ pub fn paint_background_and_grid(ctx: &mut dyn DrawCtx) {
 
 /// `strokeRect(1.5, 1.5, w-3, h-3)` cyan @ 60%, lineWidth 3.
 pub fn paint_border(ctx: &mut dyn DrawCtx) {
-    ctx.set_stroke_color(css_rgba(0, 255, 242, 0.6));
+    ctx.set_stroke_color(Color::from_rgb8(0, 255, 242).with_alpha(0.6));
     ctx.set_line_width(3.0);
     ctx.begin_path();
     ctx.rect(1.5, 1.5, GAME_W - 3.0, GAME_H - 3.0);
@@ -99,24 +87,24 @@ pub fn paint_growing_bubble(ctx: &mut dyn DrawCtx, g: &GrowingBubble) {
 fn paint_bubble_at(ctx: &mut dyn DrawCtx, x: f64, y: f64, radius: f64, is_growing: bool) {
     let (c0, c1, c2, stroke_color, stroke_w) = if is_growing {
         (
-            css_rgba(0, 255, 242, 0.4),
-            css_rgba(0, 255, 242, 0.2),
-            css_rgba(0, 255, 242, 0.1),
-            css_rgba(0, 255, 242, 0.8),
+            Color::from_rgb8(0, 255, 242).with_alpha(0.4),
+            Color::from_rgb8(0, 255, 242).with_alpha(0.2),
+            Color::from_rgb8(0, 255, 242).with_alpha(0.1),
+            Color::from_rgb8(0, 255, 242).with_alpha(0.8),
             2.0_f64,
         )
     } else {
         (
-            css_rgba(0, 200, 220, 0.6),
-            css_rgba(0, 150, 180, 0.4),
-            css_rgba(0, 100, 140, 0.2),
-            css_rgba(0, 200, 220, 0.5),
+            Color::from_rgb8(0, 200, 220).with_alpha(0.6),
+            Color::from_rgb8(0, 150, 180).with_alpha(0.4),
+            Color::from_rgb8(0, 100, 140).with_alpha(0.2),
+            Color::from_rgb8(0, 200, 220).with_alpha(0.5),
             1.0_f64,
         )
     };
 
     // Body — radial gradient fill.
-    ctx.set_fill_radial_gradient(radial_offsets(
+    ctx.set_fill_radial_gradient(RadialGradientPaint::centered(
         x,
         y,
         radius,
@@ -134,7 +122,7 @@ fn paint_bubble_at(ctx: &mut dyn DrawCtx, x: f64, y: f64, radius: f64, is_growin
     ctx.stroke();
 
     // Highlight at upper-left (in JS Y-down, "upper" is smaller y).
-    ctx.set_fill_color(css_rgba(255, 255, 255, 0.3));
+    ctx.set_fill_color(Color::from_rgb8(255, 255, 255).with_alpha(0.3));
     ctx.begin_path();
     ctx.circle(x - radius * 0.3, y - radius * 0.3, radius * 0.2);
     ctx.fill();
@@ -148,14 +136,14 @@ pub fn paint_virus(ctx: &mut dyn DrawCtx, v: &Virus, time_seconds: f32) {
     let wobble = ((time_seconds * 5.0 + v.phase).sin() * 2.0) as f64;
 
     // Body — radial gradient #ff4d6d → #c9184a → #800f2f.
-    ctx.set_fill_radial_gradient(radial_offsets(
+    ctx.set_fill_radial_gradient(RadialGradientPaint::centered(
         x,
         y,
         radius,
         &[
-            (0.0, hex(0xff, 0x4d, 0x6d)),
-            (0.6, hex(0xc9, 0x18, 0x4a)),
-            (1.0, hex(0x80, 0x0f, 0x2f)),
+            (0.0, Color::from_rgb8(0xff, 0x4d, 0x6d)),
+            (0.6, Color::from_rgb8(0xc9, 0x18, 0x4a)),
+            (1.0, Color::from_rgb8(0x80, 0x0f, 0x2f)),
         ],
     ));
     ctx.begin_path();
@@ -163,7 +151,7 @@ pub fn paint_virus(ctx: &mut dyn DrawCtx, v: &Virus, time_seconds: f32) {
     ctx.fill();
 
     // 8 spikes orbiting at radius+4+wobble; per-spike radius 4 fill #ff758f.
-    ctx.set_fill_color(hex(0xff, 0x75, 0x8f));
+    ctx.set_fill_color(Color::from_rgb8(0xff, 0x75, 0x8f));
     let orbit_r = radius + 4.0 + wobble;
     for i in 0..8 {
         let angle = (i as f64 / 8.0) * std::f64::consts::TAU + (time_seconds as f64) * 2.0;
@@ -185,13 +173,13 @@ pub fn paint_dead_virus(ctx: &mut dyn DrawCtx, d: &DeadVirus) {
     let radius = d.radius as f64;
 
     // Gray radial gradient fill.
-    ctx.set_fill_radial_gradient(radial_offsets(
+    ctx.set_fill_radial_gradient(RadialGradientPaint::centered(
         x,
         y,
         radius,
         &[
-            (0.0, css_rgba(80, 80, 100, 0.8)),
-            (1.0, css_rgba(40, 40, 60, 0.6)),
+            (0.0, Color::from_rgb8(80, 80, 100).with_alpha(0.8)),
+            (1.0, Color::from_rgb8(40, 40, 60).with_alpha(0.6)),
         ],
     ));
     ctx.begin_path();
@@ -199,7 +187,7 @@ pub fn paint_dead_virus(ctx: &mut dyn DrawCtx, d: &DeadVirus) {
     ctx.fill();
 
     // Outline.
-    ctx.set_stroke_color(css_rgba(100, 100, 120, 0.5));
+    ctx.set_stroke_color(Color::from_rgb8(100, 100, 120).with_alpha(0.5));
     ctx.set_line_width(1.0);
     ctx.begin_path();
     ctx.circle(x, y, radius);
@@ -220,33 +208,30 @@ pub fn paint_dying_virus(ctx: &mut dyn DrawCtx, dv: &DyingVirus, time_seconds: f
     let wobble = ((time_seconds * 5.0 + dv.phase).sin() as f64) * wobble_amount;
 
     // Body gradient — lerp alive→dead color stops.
-    let center = lerp_rgb((255, 77, 109), (80, 80, 100), progress);
-    let mid = lerp_rgb((201, 24, 74), (60, 60, 80), progress);
-    let edge = lerp_rgb((128, 15, 47), (40, 40, 60), progress);
+    let t = progress as f32;
+    let center = Color::from_rgb8(255, 77, 109).lerp(Color::from_rgb8(80, 80, 100), t);
+    let mid = Color::from_rgb8(201, 24, 74).lerp(Color::from_rgb8(60, 60, 80), t);
+    let edge = Color::from_rgb8(128, 15, 47).lerp(Color::from_rgb8(40, 40, 60), t);
 
     let radius = (crate::consts::VIRUS_RADIUS as f64) * (1.0 - progress * 0.1);
 
-    ctx.set_fill_radial_gradient(radial_offsets(
+    ctx.set_fill_radial_gradient(RadialGradientPaint::centered(
         x,
         y,
         radius,
-        &[
-            (0.0, hex(center.0, center.1, center.2)),
-            (0.6, hex(mid.0, mid.1, mid.2)),
-            (1.0, hex(edge.0, edge.1, edge.2)),
-        ],
+        &[(0.0, center), (0.6, mid), (1.0, edge)],
     ));
     ctx.begin_path();
     ctx.circle(x, y, radius + wobble);
     ctx.fill();
 
     // Spikes — fade and shrink, orbit slows by (1 - progress).
-    let spike_rgb = lerp_rgb((255, 117, 143), (100, 100, 120), progress);
+    let spike_color = Color::from_rgb8(255, 117, 143).lerp(Color::from_rgb8(100, 100, 120), t);
     let spike_alpha = (1.0 - progress * 0.5) as f32;
     let spike_size = 4.0 * (1.0 - progress * 0.5);
     let orbit_r = radius + 4.0 + wobble;
 
-    ctx.set_fill_color(css_rgba(spike_rgb.0, spike_rgb.1, spike_rgb.2, spike_alpha));
+    ctx.set_fill_color(spike_color.with_alpha(spike_alpha));
     for i in 0..8 {
         let angle = (i as f64 / 8.0) * std::f64::consts::TAU
             + (time_seconds as f64) * 2.0 * (1.0 - progress);
@@ -278,7 +263,7 @@ pub fn paint_pop_animation(ctx: &mut dyn DrawCtx, p: &PopAnimation) {
     let ring_alpha = 1.0 - eased;
     let ring_width = ((1.0 - eased) * 4.0).max(1.0);
 
-    ctx.set_stroke_color(css_rgba(0, 255, 242, (ring_alpha * 0.8) as f32));
+    ctx.set_stroke_color(Color::from_rgb8(0, 255, 242).with_alpha((ring_alpha * 0.8) as f32));
     ctx.set_line_width(ring_width);
     ctx.begin_path();
     ctx.circle(x, y, ring_radius);
@@ -292,7 +277,7 @@ pub fn paint_pop_animation(ctx: &mut dyn DrawCtx, p: &PopAnimation) {
         let inner_alpha = 1.0 - inner_eased;
         let inner_width = ((1.0 - inner_eased) * 3.0).max(1.0);
 
-        ctx.set_stroke_color(css_rgba(0, 200, 220, (inner_alpha * 0.6) as f32));
+        ctx.set_stroke_color(Color::from_rgb8(0, 200, 220).with_alpha((inner_alpha * 0.6) as f32));
         ctx.set_line_width(inner_width);
         ctx.begin_path();
         ctx.circle(x, y, inner_radius);
@@ -305,7 +290,7 @@ pub fn paint_pop_animation(ctx: &mut dyn DrawCtx, p: &PopAnimation) {
     let particle_size = ((1.0 - eased) * 3.0).max(1.0);
     let dist = radius * 0.5 + eased * radius * 1.2;
 
-    ctx.set_fill_color(css_rgba(0, 255, 242, particle_alpha));
+    ctx.set_fill_color(Color::from_rgb8(0, 255, 242).with_alpha(particle_alpha));
     for i in 0..num_particles {
         let angle = (i as f64 / num_particles as f64) * std::f64::consts::TAU;
         let px = x + angle.cos() * dist;
@@ -316,36 +301,7 @@ pub fn paint_pop_animation(ctx: &mut dyn DrawCtx, p: &PopAnimation) {
     }
 }
 
-/// Linear interpolation between two RGB triples (8-bit), returning rounded ints.
-fn lerp_rgb(a: (u8, u8, u8), b: (u8, u8, u8), t: f64) -> (u8, u8, u8) {
-    let lerp = |x: u8, y: u8| -> u8 {
-        let v = (x as f64) + ((y as f64) - (x as f64)) * t;
-        v.round().clamp(0.0, 255.0) as u8
-    };
-    (lerp(a.0, b.0), lerp(a.1, b.1), lerp(a.2, b.2))
-}
-
 // ---- shared sub-helpers ----
-
-/// 3-pair radial gradient. Centers and focal point coincide.
-fn radial_offsets(cx: f64, cy: f64, r: f64, stops: &[(f64, Color)]) -> RadialGradientPaint {
-    RadialGradientPaint {
-        cx,
-        cy,
-        r,
-        fx: cx,
-        fy: cy,
-        transform: TransAffine::default(),
-        spread: GradientSpread::Pad,
-        stops: stops
-            .iter()
-            .map(|(o, c)| GradientStop {
-                offset: *o,
-                color: *c,
-            })
-            .collect(),
-    }
-}
 
 /// Two white eyes with black pupils at (-4,-2) / (+4,-2) relative to (x,y).
 /// `alpha` scales both white and black opacity (used by the dying-virus morph).
@@ -353,14 +309,14 @@ fn paint_eyes_alive(ctx: &mut dyn DrawCtx, x: f64, y: f64, alpha: f32) {
     if alpha < 0.01 {
         return;
     }
-    ctx.set_fill_color(css_rgba(255, 255, 255, alpha));
+    ctx.set_fill_color(Color::from_rgb8(255, 255, 255).with_alpha(alpha));
     ctx.begin_path();
     ctx.circle(x - 4.0, y - 2.0, 3.0);
     ctx.fill();
     ctx.begin_path();
     ctx.circle(x + 4.0, y - 2.0, 3.0);
     ctx.fill();
-    ctx.set_fill_color(css_rgba(0, 0, 0, alpha));
+    ctx.set_fill_color(Color::from_rgb8(0, 0, 0).with_alpha(alpha));
     ctx.begin_path();
     ctx.circle(x - 4.0, y - 2.0, 1.5);
     ctx.fill();
@@ -374,7 +330,7 @@ fn paint_eyes_x(ctx: &mut dyn DrawCtx, x: f64, y: f64, alpha: f32) {
     if alpha < 0.01 {
         return;
     }
-    ctx.set_stroke_color(css_rgba(0x66, 0x66, 0x66, alpha));
+    ctx.set_stroke_color(Color::from_rgb8(0x66, 0x66, 0x66).with_alpha(alpha));
     ctx.set_line_width(2.0);
     // Left X
     ctx.begin_path();
