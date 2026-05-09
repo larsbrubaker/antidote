@@ -12,8 +12,9 @@
 //! Step: 8 velocity iterations, 3 position iterations.
 
 use crate::consts::{
-    to_meters, MIN_PERPENDICULAR_RATIO, PIXELS_PER_METER, WALL_PROXIMITY_THRESHOLD,
+    to_meters, to_pixels, MIN_PERPENDICULAR_RATIO, PIXELS_PER_METER, WALL_PROXIMITY_THRESHOLD,
 };
+use crate::game::state::{Bubble, DeadVirus, GrowingBubble, Virus, World};
 use rapier2d::prelude::*;
 
 /// Collision-filter categories. Match the JS reference's bitmasks exactly.
@@ -202,6 +203,260 @@ impl PhysicsWorld {
     pub fn pixels_to_meters(px: f32) -> f32 {
         px / PIXELS_PER_METER
     }
+
+    // ---- body creation (params match `antidote-physics.js`) ----
+
+    /// `createVirusBody` — dynamic, density 1.0, friction 0.0, restitution 1.0,
+    /// CCD enabled, rotation locked.
+    pub fn spawn_virus_body(&mut self, virus: &mut Virus, radius: f32) -> RigidBodyHandle {
+        let body = RigidBodyBuilder::dynamic()
+            .translation(vector![to_meters(virus.x), to_meters(virus.y)])
+            .linvel(vector![to_meters(virus.vx), to_meters(virus.vy)])
+            .lock_rotations()
+            .ccd_enabled(true)
+            .build();
+        let handle = self.bodies.insert(body);
+        let collider = ColliderBuilder::ball(to_meters(radius))
+            .density(1.0)
+            .friction(0.0)
+            .restitution(1.0)
+            .collision_groups(InteractionGroups::new(
+                category::VIRUS,
+                category::WALL
+                    | category::BUBBLE
+                    | category::VIRUS
+                    | category::DEAD_VIRUS
+                    | category::GROWING_BUBBLE,
+            ))
+            .build();
+        self.colliders
+            .insert_with_parent(collider, handle, &mut self.bodies);
+        virus.body = Some(handle);
+        handle
+    }
+
+    /// `createBubbleBody` — dynamic, density 0.5, friction 0.1, restitution 0.4,
+    /// linear damping 0.5, rotation locked.
+    pub fn spawn_bubble_body(&mut self, bubble: &mut Bubble) -> RigidBodyHandle {
+        let body = RigidBodyBuilder::dynamic()
+            .translation(vector![to_meters(bubble.x), to_meters(bubble.y)])
+            .linvel(vector![to_meters(bubble.vx), to_meters(bubble.vy)])
+            .linear_damping(0.5)
+            .lock_rotations()
+            .build();
+        let handle = self.bodies.insert(body);
+        let collider = ColliderBuilder::ball(to_meters(bubble.radius))
+            .density(0.5)
+            .friction(0.1)
+            .restitution(0.4)
+            .collision_groups(InteractionGroups::new(
+                category::BUBBLE,
+                category::WALL | category::BUBBLE | category::VIRUS | category::DEAD_VIRUS,
+            ))
+            .build();
+        self.colliders
+            .insert_with_parent(collider, handle, &mut self.bodies);
+        bubble.body = Some(handle);
+        handle
+    }
+
+    /// `createDeadVirusBody` — dynamic, density 2.0, friction 0.5, restitution 0.1,
+    /// linear damping 2.0, rotation locked.
+    pub fn spawn_dead_virus_body(&mut self, dv: &mut DeadVirus) -> RigidBodyHandle {
+        let body = RigidBodyBuilder::dynamic()
+            .translation(vector![to_meters(dv.x), to_meters(dv.y)])
+            .linvel(vector![0.0, to_meters(dv.vy)])
+            .linear_damping(2.0)
+            .lock_rotations()
+            .build();
+        let handle = self.bodies.insert(body);
+        let collider = ColliderBuilder::ball(to_meters(dv.radius))
+            .density(2.0)
+            .friction(0.5)
+            .restitution(0.1)
+            .collision_groups(InteractionGroups::new(
+                category::DEAD_VIRUS,
+                category::WALL | category::BUBBLE | category::VIRUS | category::DEAD_VIRUS,
+            ))
+            .build();
+        self.colliders
+            .insert_with_parent(collider, handle, &mut self.bodies);
+        dv.body = Some(handle);
+        handle
+    }
+
+    /// `createGrowingBubbleBody` — dynamic, density 0.1, friction 0.1,
+    /// restitution 0.0, rotation locked. Only collides with walls + viruses.
+    pub fn spawn_growing_bubble_body(&mut self, g: &mut GrowingBubble) -> RigidBodyHandle {
+        let body = RigidBodyBuilder::dynamic()
+            .translation(vector![to_meters(g.x), to_meters(g.y)])
+            .lock_rotations()
+            .build();
+        let handle = self.bodies.insert(body);
+        let collider = ColliderBuilder::ball(to_meters(g.radius))
+            .density(0.1)
+            .friction(0.1)
+            .restitution(0.0)
+            .collision_groups(InteractionGroups::new(
+                category::GROWING_BUBBLE,
+                category::WALL | category::VIRUS,
+            ))
+            .build();
+        self.colliders
+            .insert_with_parent(collider, handle, &mut self.bodies);
+        g.body = Some(handle);
+        handle
+    }
+
+    /// Replace the growing-bubble's collider with a new one of the given radius.
+    /// Mirrors `updateGrowingBubbleRadius` in the JS reference.
+    pub fn resize_growing_bubble_collider(&mut self, handle: RigidBodyHandle, new_radius: f32) {
+        // Remove the existing collider(s) on this body, then add a new one.
+        let collider_handles: Vec<_> = self.bodies[handle].colliders().to_vec();
+        for ch in collider_handles {
+            self.colliders
+                .remove(ch, &mut self.island_manager, &mut self.bodies, false);
+        }
+        let collider = ColliderBuilder::ball(to_meters(new_radius))
+            .density(0.1)
+            .friction(0.1)
+            .restitution(0.0)
+            .collision_groups(InteractionGroups::new(
+                category::GROWING_BUBBLE,
+                category::WALL | category::VIRUS,
+            ))
+            .build();
+        self.colliders
+            .insert_with_parent(collider, handle, &mut self.bodies);
+    }
+
+    /// Remove a body + its colliders from the world.
+    pub fn destroy_body(&mut self, handle: RigidBodyHandle) {
+        self.bodies.remove(
+            handle,
+            &mut self.island_manager,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            true,
+        );
+    }
+
+    /// Push physics-world body positions back into the game-state entities.
+    /// Mirrors `syncBodiesToGameObjects`.
+    pub fn sync_to_world(&self, world: &mut World) {
+        for v in world.viruses.iter_mut() {
+            let Some(h) = v.body else { continue };
+            let Some(rb) = self.bodies.get(h) else {
+                continue;
+            };
+            let p = rb.translation();
+            let lv = rb.linvel();
+            v.x = to_pixels(p.x);
+            v.y = to_pixels(p.y);
+            v.vx = to_pixels(lv.x);
+            v.vy = to_pixels(lv.y);
+        }
+        for b in world.solid_bubbles.iter_mut() {
+            let Some(h) = b.body else { continue };
+            let Some(rb) = self.bodies.get(h) else {
+                continue;
+            };
+            let p = rb.translation();
+            let lv = rb.linvel();
+            b.x = to_pixels(p.x);
+            b.y = to_pixels(p.y);
+            b.vx = to_pixels(lv.x);
+            b.vy = to_pixels(lv.y);
+        }
+        for d in world.dead_viruses.iter_mut() {
+            let Some(h) = d.body else { continue };
+            let Some(rb) = self.bodies.get(h) else {
+                continue;
+            };
+            let p = rb.translation();
+            let lv = rb.linvel();
+            d.x = to_pixels(p.x);
+            d.y = to_pixels(p.y);
+            d.vy = to_pixels(lv.y);
+        }
+        if let Some(g) = world.growing.as_mut() {
+            if let Some(h) = g.body {
+                if let Some(rb) = self.bodies.get(h) {
+                    let p = rb.translation();
+                    g.x = to_pixels(p.x);
+                    g.y = to_pixels(p.y);
+                }
+            }
+        }
+    }
+
+    /// Apply the per-frame upward float force to every solid bubble.
+    /// `force` is in pixels/s²; converted internally.
+    pub fn apply_bubble_float(&mut self, world: &World, force_px: f32) {
+        let force = vector![0.0, -to_meters(force_px)];
+        for b in &world.solid_bubbles {
+            let Some(h) = b.body else { continue };
+            let Some(rb) = self.bodies.get_mut(h) else {
+                continue;
+            };
+            rb.add_force(force, true);
+        }
+    }
+
+    /// Apply downward gravity to dead viruses (so they sink despite damping).
+    pub fn apply_dead_virus_gravity(&mut self, world: &World, sink_speed: f32) {
+        let force = vector![0.0, to_meters(sink_speed * 2.0)];
+        for d in &world.dead_viruses {
+            let Some(h) = d.body else { continue };
+            let Some(rb) = self.bodies.get_mut(h) else {
+                continue;
+            };
+            rb.add_force(force, true);
+        }
+    }
+
+    /// Re-scale virus velocities to `target_speed` after running wall-slide
+    /// correction. Mirrors `maintainVirusSpeeds` in the JS reference.
+    pub fn maintain_virus_speeds(&mut self, world: &mut World, target_speed: f32) {
+        for v in world.viruses.iter_mut() {
+            let Some(h) = v.body else {
+                continue;
+            };
+            let Some(rb) = self.bodies.get_mut(h) else {
+                continue;
+            };
+            let p = rb.translation();
+            let lv = rb.linvel();
+            let speed = (lv.x * lv.x + lv.y * lv.y).sqrt();
+            if speed <= 0.01 {
+                continue;
+            }
+
+            let pixel_x = to_pixels(p.x);
+            let pixel_y = to_pixels(p.y);
+            let pixel_vx = to_pixels(lv.x);
+            let pixel_vy = to_pixels(lv.y);
+
+            let (cvx, cvy) = correct_wall_slide_velocity(
+                pixel_x,
+                pixel_y,
+                pixel_vx,
+                pixel_vy,
+                self.game_width,
+                self.game_height,
+            );
+            let corrected_speed = (cvx * cvx + cvy * cvy).sqrt();
+            if corrected_speed <= 0.01 {
+                continue;
+            }
+            let scale = target_speed / corrected_speed;
+            rb.set_linvel(
+                vector![to_meters(cvx * scale), to_meters(cvy * scale)],
+                true,
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -237,5 +492,33 @@ mod tests {
         let mut world = PhysicsWorld::new(800.0, 600.0);
         world.step(1.0 / 60.0);
         world.step(1.0 / 60.0);
+    }
+
+    #[test]
+    fn virus_spawn_step_sync_round_trip() {
+        let mut phys = PhysicsWorld::new(800.0, 600.0);
+        let mut world = World::new();
+        world.viruses.push(Virus {
+            x: 200.0,
+            y: 300.0,
+            vx: 100.0,
+            vy: 0.0,
+            phase: 0.0,
+            last_unstuck_x: 200.0,
+            last_unstuck_y: 300.0,
+            stuck_time: 0.0,
+            speed: 100.0,
+            body: None,
+        });
+        let radius = crate::consts::VIRUS_RADIUS;
+        phys.spawn_virus_body(&mut world.viruses[0], radius);
+        assert!(world.viruses[0].body.is_some());
+
+        // Step a few frames; virus should move right (positive vx).
+        for _ in 0..30 {
+            phys.step(1.0 / 60.0);
+        }
+        phys.sync_to_world(&mut world);
+        assert!(world.viruses[0].x > 200.0, "virus did not move right");
     }
 }

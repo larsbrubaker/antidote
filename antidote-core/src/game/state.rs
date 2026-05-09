@@ -1,6 +1,8 @@
 //! World state. Plain structs; no ECS. Mirrors the JS reference's globals
 //! in `reference/GFG/public/games/antidote/antidote.js`.
 
+use rapier2d::prelude::RigidBodyHandle;
+
 use crate::consts::{BASE_ANTIDOTE_TIME, BASE_LIVES};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +29,7 @@ pub struct Virus {
     pub last_unstuck_y: f32,
     pub stuck_time: f32,
     pub speed: f32,
+    pub body: Option<RigidBodyHandle>,
 }
 
 /// A virus in the dying-animation transition (alive → dead).
@@ -48,6 +51,7 @@ pub struct Bubble {
     pub radius: f32,
     pub vx: f32,
     pub vy: f32,
+    pub body: Option<RigidBodyHandle>,
 }
 
 /// A dead virus that sinks downward.
@@ -57,6 +61,7 @@ pub struct DeadVirus {
     pub y: f32,
     pub radius: f32,
     pub vy: f32,
+    pub body: Option<RigidBodyHandle>,
 }
 
 /// The bubble the player is currently growing.
@@ -70,6 +75,7 @@ pub struct GrowingBubble {
     /// Indices into `World::solid_bubbles` / `World::dead_viruses` that this
     /// bubble was started inside of; used to slide out gradually before growing.
     pub initial_overlaps: Vec<InitialOverlap>,
+    pub body: Option<RigidBodyHandle>,
 }
 
 #[derive(Debug, Clone, Copy)]
