@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Native (winit + wgpu) shell for the Antidote game."
+description = "Native (winit + software-rasterized agg-gui) shell for the Antidote game."
 
 [dependencies]
 antidote-core = { path = "../antidote-core" }
@@ -17,5 +17,5 @@ tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
 flume = "0.11"
 dotenvy = "0.15"
 dirs = "5"
-pollster = "0.3"
+softbuffer = "0.4"
 winit = "0.30"
