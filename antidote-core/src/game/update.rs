@@ -37,7 +37,12 @@ pub fn tick(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
 
     grow_bubble(world, physics, dt);
 
-    physics.apply_bubble_float(world, BUBBLE_FLOAT_SPEED * 2.0);
+    // JS-faithful constant force (`BUBBLE_FLOAT_SPEED * 2`) with an
+    // additional upward-speed cap of `BUBBLE_FLOAT_SPEED * 1.5` so small
+    // bubbles don't rocket up at ~240 px/s. Both ingredients matter:
+    // constant force keeps the cluster jittery enough for viruses to
+    // escape, the cap keeps the small bubbles from feeling unhinged.
+    physics.apply_bubble_float(world, BUBBLE_FLOAT_SPEED * 2.0, BUBBLE_FLOAT_SPEED * 1.5);
     physics.apply_dead_virus_gravity(world, DEAD_VIRUS_SINK_SPEED);
 
     physics.step(dt);

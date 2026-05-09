@@ -16,6 +16,32 @@ pub fn virus_speed_for_level(level: u32) -> f32 {
 /// `initLevel()` in the JS reference: clear all entities, set antidote
 /// budget, spawn viruses.
 pub fn init_level(world: &mut World, physics: &mut PhysicsWorld) {
+    // Destroy every rapier body the world references BEFORE wiping the Vecs;
+    // otherwise the previous level's bubbles, dead viruses, and any
+    // in-progress growing bubble would persist as invisible colliders that
+    // newly-spawned viruses can pin themselves against (manifests as "virus
+    // stuck dead-center on level start").
+    for v in &world.viruses {
+        if let Some(h) = v.body {
+            physics.destroy_body(h);
+        }
+    }
+    for b in &world.solid_bubbles {
+        if let Some(h) = b.body {
+            physics.destroy_body(h);
+        }
+    }
+    for d in &world.dead_viruses {
+        if let Some(h) = d.body {
+            physics.destroy_body(h);
+        }
+    }
+    if let Some(g) = world.growing.as_ref() {
+        if let Some(h) = g.body {
+            physics.destroy_body(h);
+        }
+    }
+
     world.viruses.clear();
     world.solid_bubbles.clear();
     world.dead_viruses.clear();
@@ -96,5 +122,56 @@ mod tests {
             assert!(v.x >= VIRTUAL_WIDTH * 0.2 && v.x <= VIRTUAL_WIDTH * 0.8);
             assert!(v.y >= VIRTUAL_HEIGHT * 0.2 && v.y <= VIRTUAL_HEIGHT * 0.8);
         }
+    }
+
+    /// Re-initializing a level must not leak rapier bodies from the previous
+    /// level. Without the destroy-bodies pass at the top of `init_level`,
+    /// each level transition would accumulate ghost colliders that pin newly
+    /// spawned viruses ("virus stuck dead-center on level start").
+    #[test]
+    fn init_level_does_not_leak_physics_bodies() {
+        use crate::game::state::{Bubble, DeadVirus};
+        let mut world = World::new();
+        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+        world.level = 5;
+        init_level(&mut world, &mut physics);
+        // Walls (4) + 3 viruses for level 5.
+        let baseline = physics.bodies.len();
+        assert_eq!(world.viruses.len(), 3);
+        assert_eq!(baseline, 7);
+
+        // Stage a bubble and a dead virus, both with rapier bodies.
+        let mut bubble = Bubble {
+            x: 200.0,
+            y: 200.0,
+            radius: 20.0,
+            vx: 0.0,
+            vy: 0.0,
+            body: None,
+        };
+        physics.spawn_bubble_body(&mut bubble);
+        world.solid_bubbles.push(bubble);
+
+        let mut dead = DeadVirus {
+            x: 300.0,
+            y: 300.0,
+            radius: 14.0,
+            vy: 0.0,
+            body: None,
+        };
+        physics.spawn_dead_virus_body(&mut dead);
+        world.dead_viruses.push(dead);
+
+        assert_eq!(physics.bodies.len(), baseline + 2);
+
+        // Advance to the next level. New viruses spawn fresh; bubble +
+        // dead virus from previous level must be destroyed in physics.
+        world.level += 1;
+        init_level(&mut world, &mut physics);
+
+        let virus_count = virus_count_for_level(world.level) as usize;
+        // Walls (4) + viruses; nothing else lingers.
+        assert_eq!(physics.bodies.len(), 4 + virus_count);
     }
 }

@@ -69,10 +69,16 @@ fn header_label(text: &str, font: Arc<Font>, size: f64) -> Box<dyn Widget> {
 }
 
 fn body_label(text: &str, font: Arc<Font>, color: Option<Color>) -> Box<dyn Widget> {
+    // Wrap so longer body strings reflow onto multiple lines instead of
+    // getting clipped at the column edge. `Label::layout` with `wrap = false`
+    // returns `min(natural_width, available_width)` and `paint` clips to its
+    // own bounds, so a too-wide string becomes ":o grow a bubble. Trap..."
+    // chopped on both sides — exactly the artifact the user reported.
     let mut lbl = Label::new(text, font)
         .with_font_size(16.0)
         .with_align(LabelAlign::Center)
         .with_has_backbuffer(false)
+        .with_wrap(true)
         .with_min_size(Size::new(COL_W, 22.0));
     if let Some(c) = color {
         lbl = lbl.with_color(c);

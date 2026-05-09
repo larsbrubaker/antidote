@@ -10,6 +10,7 @@ use crate::game::timestep::FIXED_DT;
 use crate::game::update;
 use crate::render::scene;
 use crate::ui::game_model::SharedModel;
+use crate::ui::hud_widget::HUD_HEIGHT;
 
 pub struct GameWidget {
     bounds: Rect,
@@ -26,15 +27,17 @@ impl GameWidget {
         }
     }
 
-    /// Compute a centered letterbox: scale that fits 800×600 into the widget
-    /// bounds, plus the centered offset.
+    /// Compute a centered letterbox into the area BELOW the HUD bar so the top
+    /// strip of the screen reads as chrome, not playfield.
     fn letterbox(&self) -> Letterbox {
         let w = self.bounds.width as f32;
-        let h = self.bounds.height as f32;
+        let h_full = self.bounds.height as f32;
+        let hud = HUD_HEIGHT as f32;
+        let h_play = (h_full - hud).max(0.0);
         let target = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
-        let widget_aspect = if h > 0.0 { w / h } else { target };
+        let widget_aspect = if h_play > 0.0 { w / h_play } else { target };
         let scale = if widget_aspect >= target {
-            h / VIRTUAL_HEIGHT
+            h_play / VIRTUAL_HEIGHT
         } else {
             w / VIRTUAL_WIDTH
         };
@@ -43,7 +46,8 @@ impl GameWidget {
         Letterbox {
             scale,
             offset_x: (w - game_w) * 0.5,
-            offset_y: (h - game_h) * 0.5,
+            // Y-up: subtract HUD strip from the top of the available area.
+            offset_y: (h_play - game_h) * 0.5,
             game_h,
         }
     }

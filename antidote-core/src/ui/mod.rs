@@ -153,7 +153,8 @@ mod tests {
         // Start a level so viruses are moving, then pause and confirm
         // they don't drift over a 1-second simulated tick.
         let mut world = World::new();
-        let mut physics = PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
+        let mut physics =
+            PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
         world.level = 1;
         init_level(&mut world, &mut physics);
         let v0 = world.viruses[0];
@@ -173,7 +174,8 @@ mod tests {
     #[test]
     fn level_start_score_snapshots_total_score() {
         let mut world = World::new();
-        let mut physics = PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
+        let mut physics =
+            PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
         world.total_score = 250;
         world.level = 3;
         init_level(&mut world, &mut physics);
@@ -190,7 +192,8 @@ mod tests {
         use crate::consts::BASE_LIVES;
         use crate::game::update::start_new_game;
         let mut world = World::new();
-        let mut physics = PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
+        let mut physics =
+            PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
         world.lives = 0;
         world.level = 5;
         world.total_score = 999;
@@ -212,7 +215,8 @@ mod tests {
     fn advance_to_next_level_bumps_level_keeps_score() {
         use crate::game::update::advance_to_next_level;
         let mut world = World::new();
-        let mut physics = PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
+        let mut physics =
+            PhysicsWorld::new(crate::consts::VIRTUAL_WIDTH, crate::consts::VIRTUAL_HEIGHT);
         world.level = 2;
         world.total_score = 300;
         world.phase = Phase::LevelComplete;
@@ -250,7 +254,10 @@ mod tests {
 
         // Click at (400, 300) — well clear of the virus so the bubble starts.
         on_pointer_down(&mut world, &mut physics, 400.0, 300.0);
-        assert!(world.growing.is_some(), "growing bubble should have started");
+        assert!(
+            world.growing.is_some(),
+            "growing bubble should have started"
+        );
 
         // Manually move the virus into the bubble so the next tick's
         // collision check sees an overlap. We use just-inside the bubble's

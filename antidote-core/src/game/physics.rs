@@ -250,6 +250,12 @@ impl PhysicsWorld {
             .linvel(vector![to_meters(bubble.vx), to_meters(bubble.vy)])
             .linear_damping(0.5)
             .lock_rotations()
+            // Don't let bubbles fall asleep — once they wedge against the
+            // top wall, rapier deactivates them and the per-step
+            // `add_force` (and incoming virus collisions) stop registering,
+            // producing the "bubble locked in place" symptom. Planck/JS
+            // does not have this sleep behavior, so we opt out here.
+            .can_sleep(false)
             .build();
         let handle = self.bodies.insert(body);
         let collider = ColliderBuilder::ball(to_meters(bubble.radius))
@@ -416,14 +422,30 @@ impl PhysicsWorld {
 
     /// Apply the per-frame upward float force to every solid bubble.
     /// `force` is in pixels/s²; converted internally.
-    pub fn apply_bubble_float(&mut self, world: &World, force_px: f32) {
+    /// Apply the JS reference's constant upward float force to every bubble,
+    /// suppressed once the bubble is already moving up faster than `max_speed_px`
+    /// so small bubbles don't rocket past it.
+    ///
+    /// Why a cap rather than mass-proportional force: a clean
+    /// "every bubble's terminal velocity = target" model leaves bubbles too
+    /// calm — they pile against the top wall in a stable cluster and any
+    /// virus that gets wedged inside has no escape route, so its 3-second
+    /// trap timer fires and it dies. The constant-force model creates the
+    /// natural agitation that breaks clusters open. The cap keeps the small
+    /// bubbles from feeling "way too fast."
+    pub fn apply_bubble_float(&mut self, world: &World, force_px: f32, max_speed_px: f32) {
         let force = vector![0.0, -to_meters(force_px)];
+        // Y-down convention: moving up = negative Y velocity. Cap the upward
+        // motion at -max_speed (more negative = faster up).
+        let max_v_up_m = -to_meters(max_speed_px);
         for b in &world.solid_bubbles {
             let Some(h) = b.body else { continue };
             let Some(rb) = self.bodies.get_mut(h) else {
                 continue;
             };
-            rb.add_force(force, true);
+            if rb.linvel().y > max_v_up_m {
+                rb.add_force(force, true);
+            }
         }
     }
 
