@@ -46,6 +46,13 @@ pub fn tick(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
     physics.apply_dead_virus_gravity(world, DEAD_VIRUS_SINK_SPEED);
 
     physics.step(dt);
+    // Hard playfield-boundary guarantee: snap any body whose centre escaped
+    // the [radius, W-radius] × [radius, H-radius] rectangle back inside,
+    // killing the outward velocity component. CCD plus rapier's contact
+    // resolution should prevent this in normal play, but extreme virus
+    // impulses can still tunnel a bubble for one frame, and the user
+    // requirement is "no bubble should ever cross the window frame".
+    physics.clamp_to_playfield(world);
     physics.sync_to_world(world);
 
     let target_speed = virus_speed_for_level(world.level);

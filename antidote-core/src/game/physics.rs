@@ -29,6 +29,62 @@ pub mod category {
     pub const GROWING_BUBBLE: Group = Group::GROUP_5;
 }
 
+/// Free-standing helper for [`PhysicsWorld::clamp_to_playfield`]. Snaps a
+/// rapier body's centre back into the playfield rectangle (in pixels) and
+/// kills the outward-pointing velocity component so the next step doesn't
+/// immediately re-escape.
+fn clamp_body_inside(
+    bodies: &mut RigidBodySet,
+    handle: RigidBodyHandle,
+    radius_px: f32,
+    game_width_px: f32,
+    game_height_px: f32,
+) {
+    let Some(rb) = bodies.get_mut(handle) else {
+        return;
+    };
+    let r_m = to_meters(radius_px);
+    let w_m = to_meters(game_width_px);
+    let h_m = to_meters(game_height_px);
+    let p = *rb.translation();
+    let v = *rb.linvel();
+    let mut new_x = p.x;
+    let mut new_y = p.y;
+    let mut new_vx = v.x;
+    let mut new_vy = v.y;
+    let mut changed = false;
+    if p.x < r_m {
+        new_x = r_m;
+        if v.x < 0.0 {
+            new_vx = 0.0;
+        }
+        changed = true;
+    } else if p.x > w_m - r_m {
+        new_x = w_m - r_m;
+        if v.x > 0.0 {
+            new_vx = 0.0;
+        }
+        changed = true;
+    }
+    if p.y < r_m {
+        new_y = r_m;
+        if v.y < 0.0 {
+            new_vy = 0.0;
+        }
+        changed = true;
+    } else if p.y > h_m - r_m {
+        new_y = h_m - r_m;
+        if v.y > 0.0 {
+            new_vy = 0.0;
+        }
+        changed = true;
+    }
+    if changed {
+        rb.set_translation(vector![new_x, new_y], true);
+        rb.set_linvel(vector![new_vx, new_vy], true);
+    }
+}
+
 /// `correctWallSlideVelocity` from `antidote-core.js`. When a virus is near a
 /// wall and moving mostly parallel to it, push the perpendicular component up
 /// so the next step bounces away cleanly. Total speed is preserved.
@@ -250,6 +306,14 @@ impl PhysicsWorld {
             .linvel(vector![to_meters(bubble.vx), to_meters(bubble.vy)])
             .linear_damping(0.5)
             .lock_rotations()
+            // CCD on bubbles too — without it a virus impact can give a
+            // bubble enough velocity to tunnel through the 0.5 m wall in a
+            // single fixed-step tick. Walls would still nudge the body back
+            // on the next step, but for one frame the bubble's centre has
+            // already moved past the playfield. The hard `clamp_to_playfield`
+            // post-step is the ultimate safety net (see below); CCD prevents
+            // the visible flicker.
+            .ccd_enabled(true)
             // Don't let bubbles fall asleep — once they wedge against the
             // top wall, rapier deactivates them and the per-step
             // `add_force` (and incoming virus collisions) stop registering,
@@ -283,6 +347,10 @@ impl PhysicsWorld {
             .linvel(vector![0.0, to_meters(dv.vy)])
             .linear_damping(2.0)
             .lock_rotations()
+            // CCD here too — a stack of dead viruses sinking with continuous
+            // gravity force occasionally builds enough downward velocity to
+            // poke through the bottom wall.
+            .ccd_enabled(true)
             .build();
         let handle = self.bodies.insert(body);
         let collider = ColliderBuilder::ball(to_meters(dv.radius))
@@ -369,6 +437,48 @@ impl PhysicsWorld {
             &mut self.multibody_joints,
             true,
         );
+    }
+
+    /// Hard playfield-boundary guarantee. The user-visible promise is that
+    /// **no body ever crosses the window frame**, period. Rapier's velocity
+    /// solver normally enforces this via the four wall colliders, but in
+    /// extreme cases (high-impulse virus → bubble collision combined with
+    /// the per-frame upward float force) the position integrator can
+    /// briefly resolve outside the wall before the next contact step pulls
+    /// it back. CCD eliminates most of that — this method is the safety
+    /// net for the rest.
+    ///
+    /// For every dynamic body (virus, solid bubble, dead virus, growing
+    /// bubble): if the centre lies outside `[radius, W-radius] ×
+    /// [radius, H-radius]`, snap it back inside and zero the
+    /// outward-pointing velocity component so the next step doesn't immediately
+    /// shoot back through.
+    ///
+    /// Call after `step` and before `sync_to_world` so the world view
+    /// observes the corrected positions.
+    pub fn clamp_to_playfield(&mut self, world: &World) {
+        let w = self.game_width;
+        let h = self.game_height;
+        for v in &world.viruses {
+            if let Some(handle) = v.body {
+                clamp_body_inside(&mut self.bodies, handle, crate::consts::VIRUS_RADIUS, w, h);
+            }
+        }
+        for b in &world.solid_bubbles {
+            if let Some(handle) = b.body {
+                clamp_body_inside(&mut self.bodies, handle, b.radius, w, h);
+            }
+        }
+        for d in &world.dead_viruses {
+            if let Some(handle) = d.body {
+                clamp_body_inside(&mut self.bodies, handle, d.radius, w, h);
+            }
+        }
+        if let Some(g) = &world.growing {
+            if let Some(handle) = g.body {
+                clamp_body_inside(&mut self.bodies, handle, g.radius, w, h);
+            }
+        }
     }
 
     /// Push physics-world body positions back into the game-state entities.
@@ -537,6 +647,52 @@ mod tests {
         let mut world = PhysicsWorld::new(800.0, 600.0);
         world.step(1.0 / 60.0);
         world.step(1.0 / 60.0);
+    }
+
+    /// Regression: a bubble launched at ten times its terminal speed straight
+    /// up at the wall must never exit the playfield. Mirrors the
+    /// "throws bubbles above the top of the window" symptom Lars reported —
+    /// the safety net is `clamp_to_playfield`. We sim 5 seconds at 60 Hz.
+    #[test]
+    fn bubble_never_escapes_playfield_under_extreme_velocity() {
+        use crate::game::state::{Bubble, World};
+        let mut phys = PhysicsWorld::new(800.0, 600.0);
+        let mut world = World::new();
+        // Sit the bubble two pixels below the top wall and slam upward at
+        // 1500 px/s — that's ~10× the JS reference's float-speed cap.
+        world.solid_bubbles.push(Bubble {
+            x: 400.0,
+            y: 30.0,
+            radius: 25.0,
+            vx: 0.0,
+            vy: -1500.0,
+            body: None,
+        });
+        phys.spawn_bubble_body(&mut world.solid_bubbles[0]);
+
+        for _ in 0..(5 * 60) {
+            // Mirror the gameplay tick: continuous upward float force, step,
+            // clamp, sync.
+            phys.apply_bubble_float(
+                &world,
+                crate::consts::BUBBLE_FLOAT_SPEED * 2.0,
+                crate::consts::BUBBLE_FLOAT_SPEED * 1.5,
+            );
+            phys.step(1.0 / 60.0);
+            phys.clamp_to_playfield(&world);
+            phys.sync_to_world(&mut world);
+            let b = &world.solid_bubbles[0];
+            assert!(
+                b.x >= b.radius - 0.001 && b.x <= 800.0 - b.radius + 0.001,
+                "bubble left horizontally to x={}",
+                b.x
+            );
+            assert!(
+                b.y >= b.radius - 0.001 && b.y <= 600.0 - b.radius + 0.001,
+                "bubble escaped to y={}",
+                b.y
+            );
+        }
     }
 
     #[test]
