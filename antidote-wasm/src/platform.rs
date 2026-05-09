@@ -1,7 +1,7 @@
 //! Wasm `Storage` impl — `localStorage["antidote_session"]`.
 #![allow(dead_code)] // wired up in M5
 
-use antidote_core::db::auth::Session;
+use antidote_core::db::inbox::Session;
 use antidote_core::platform::Storage;
 
 const KEY: &str = "antidote_session";

@@ -19,16 +19,16 @@ use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
 use crate::game::state::{Phase, World};
 use crate::game::update;
-use crate::ui::game_model::SharedModel;
+use crate::ui::game_model::{MenuView, SharedModel};
 
 /// Width of the centered column that holds the menu widgets.
-const COL_W: f64 = 360.0;
+pub const COL_W: f64 = 360.0;
 /// Vertical gap between adjacent items in the column.
-const COL_GAP: f64 = 12.0;
+pub const COL_GAP: f64 = 12.0;
 
 // ─── Backdrop helpers ────────────────────────────────────────────────────────
 
-fn paint_backdrop(ctx: &mut dyn DrawCtx, w: f64, h: f64) {
+pub fn paint_backdrop(ctx: &mut dyn DrawCtx, w: f64, h: f64) {
     ctx.set_fill_color(Color::rgba(0.04, 0.06, 0.10, 0.66));
     ctx.begin_path();
     ctx.rect(0.0, 0.0, w, h);
@@ -38,7 +38,7 @@ fn paint_backdrop(ctx: &mut dyn DrawCtx, w: f64, h: f64) {
 /// Lay out children top-down in a centered column inside `(width, height)`.
 /// Each child gets `COL_W` of horizontal space; vertical gap between each is
 /// `COL_GAP`. The column is vertically centered.
-fn layout_centered_column(children: &mut [Box<dyn Widget>], width: f64, height: f64) {
+pub fn layout_centered_column(children: &mut [Box<dyn Widget>], width: f64, height: f64) {
     let mut sizes: Vec<Size> = Vec::with_capacity(children.len());
     let mut total_h = 0.0;
     for (i, c) in children.iter_mut().enumerate() {
@@ -58,7 +58,7 @@ fn layout_centered_column(children: &mut [Box<dyn Widget>], width: f64, height: 
     }
 }
 
-fn header_label(text: &str, font: Arc<Font>, size: f64) -> Box<dyn Widget> {
+pub fn header_label(text: &str, font: Arc<Font>, size: f64) -> Box<dyn Widget> {
     Box::new(
         Label::new(text, font)
             .with_font_size(size)
@@ -68,7 +68,7 @@ fn header_label(text: &str, font: Arc<Font>, size: f64) -> Box<dyn Widget> {
     )
 }
 
-fn body_label(text: &str, font: Arc<Font>, color: Option<Color>) -> Box<dyn Widget> {
+pub fn body_label(text: &str, font: Arc<Font>, color: Option<Color>) -> Box<dyn Widget> {
     // Wrap so longer body strings reflow onto multiple lines instead of
     // getting clipped at the column edge. `Label::layout` with `wrap = false`
     // returns `min(natural_width, available_width)` and `paint` clips to its
@@ -86,7 +86,7 @@ fn body_label(text: &str, font: Arc<Font>, color: Option<Color>) -> Box<dyn Widg
     Box::new(lbl)
 }
 
-fn primary_button(
+pub fn primary_button(
     text: &str,
     font: Arc<Font>,
     on_click: impl FnMut() + 'static,
@@ -99,7 +99,7 @@ fn primary_button(
     )
 }
 
-fn secondary_button(
+pub fn secondary_button(
     text: &str,
     font: Arc<Font>,
     on_click: impl FnMut() + 'static,
@@ -116,18 +116,6 @@ fn secondary_button(
             .with_theme(theme)
             .with_min_size(Size::new(COL_W, 38.0))
             .on_click(on_click),
-    )
-}
-
-/// A button that's permanently disabled — visual placeholder for Phase 3
-/// pieces (sign-in, leaderboard, other-games) the main menu reserves space
-/// for until Supabase is wired up.
-fn placeholder_button(text: &str, font: Arc<Font>) -> Box<dyn Widget> {
-    Box::new(
-        Button::new(text, font)
-            .with_font_size(15.0)
-            .with_min_size(Size::new(COL_W, 36.0))
-            .with_enabled_fn(|| false),
     )
 }
 
@@ -155,6 +143,9 @@ pub struct MainMenuOverlay {
 impl MainMenuOverlay {
     pub fn new(model: SharedModel, font: Arc<Font>) -> Self {
         let play_model = model.clone();
+        let signin_model = model.clone();
+        let leaderboard_model = model.clone();
+        let other_games_model = model.clone();
         let children: Vec<Box<dyn Widget>> = vec![
             header_label("Antidote", font.clone(), 36.0),
             body_label(
@@ -167,15 +158,44 @@ impl MainMenuOverlay {
                 let m = &mut *m;
                 update::start_new_game(&mut m.world, &mut m.physics);
             }),
-            placeholder_button("Sign in (coming soon)", font.clone()),
-            placeholder_button("Leaderboard (coming soon)", font.clone()),
-            placeholder_button("Other games (coming soon)", font),
+            // The signed-out / signed-in label rotates between "Sign in" and
+            // "Sign out (you@example.com)". `refresh_dynamic_text` rewrites
+            // the label every layout pass.
+            secondary_button("Sign in", font.clone(), move || {
+                let mut m = signin_model.borrow_mut();
+                if m.auth.session.is_some() {
+                    // Signed in already — sign out.
+                    m.auth.session = None;
+                    m.services.postgrest.set_access_token(None);
+                } else {
+                    m.menu_view = MenuView::SignIn;
+                }
+            }),
+            secondary_button("Leaderboard", font.clone(), move || {
+                leaderboard_model.borrow_mut().menu_view = MenuView::Leaderboard;
+            }),
+            secondary_button("Other games", font, move || {
+                other_games_model.borrow_mut().menu_view = MenuView::OtherGames;
+            }),
         ];
         Self {
             bounds: Rect::default(),
             children,
             model,
         }
+    }
+
+    /// Update the sign-in button label to reflect signed-in state, since
+    /// the same button toggles between sign-in and sign-out.
+    fn refresh_dynamic_text(&mut self) {
+        let label = match self.model.borrow().auth.session.as_ref() {
+            Some(s) => match &s.email {
+                Some(email) => format!("Sign out ({email})"),
+                None => "Sign out".to_owned(),
+            },
+            None => "Sign in".to_owned(),
+        };
+        self.children[3].set_label_text(&label);
     }
 }
 
@@ -196,9 +216,11 @@ impl Widget for MainMenuOverlay {
         &mut self.children
     }
     fn is_visible(&self) -> bool {
-        self.model.borrow().world.phase == Phase::Start
+        let m = self.model.borrow();
+        m.world.phase == Phase::Start && m.menu_view == MenuView::Main
     }
     fn layout(&mut self, available: Size) -> Size {
+        self.refresh_dynamic_text();
         layout_centered_column(&mut self.children, available.width, available.height);
         available
     }

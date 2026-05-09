@@ -14,16 +14,17 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 web-time = { workspace = true }
 rapier2d = { workspace = true }
+# `ehttp` is the cross-platform fetch we use for Supabase REST. It uses ureq
+# on native (off the calling thread, so no tokio runtime required) and the
+# browser's fetch API on wasm32. Callbacks get `Send` futures, so widgets
+# bridge results back to the synchronous frame loop via a `flume` channel.
+ehttp = "0.3"
 flume = { version = "0.11", default-features = false, features = ["async"] }
 futures-util = { version = "0.3", default-features = false }
 thiserror = "1"
 rand = "0.8"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen-futures = "0.4"
 

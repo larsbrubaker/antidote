@@ -1,7 +1,7 @@
 //! Native `Storage` impl — JSON file under `dirs::config_dir()/antidote/session.json`.
 #![allow(dead_code)] // wired up in M3
 
-use antidote_core::db::auth::Session;
+use antidote_core::db::inbox::Session;
 use antidote_core::platform::Storage;
 use std::fs;
 use std::path::PathBuf;

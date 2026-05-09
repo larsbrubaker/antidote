@@ -24,12 +24,18 @@ pub mod menu_widget;
 pub mod other_games_widget;
 pub mod overlay_stack;
 
+use crate::db::inbox::DbInboxEvent;
 use crate::game::state::Phase;
-use game_model::{shared, SharedModel};
+use auth_widget::SignInOverlay;
+#[cfg(test)]
+use game_model::shared;
+use game_model::{shared_with_config, MenuView, SharedModel, SupabaseConfig};
 use game_widget::GameWidget;
 use hud_widget::HudWidget;
+use leaderboard_widget::LeaderboardOverlay;
 use life_lost_overlay::LifeLostOverlay;
 use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseOverlay};
+use other_games_widget::OtherGamesOverlay;
 use overlay_stack::OverlayStack;
 
 /// CascadiaCode is bundled into the binary so neither shell has to ship a
@@ -40,18 +46,25 @@ fn load_default_font() -> Arc<Font> {
     Arc::new(Font::from_slice(FONT_BYTES).expect("antidote default font"))
 }
 
-/// Build the shared Antidote application.
-///
-/// This is the single entry point platform shells use for the game UI. Returns
-/// an [`App`] with the full widget tree and global key handler already wired
-/// up — Esc/P toggles pause from `Playing` ↔ `Paused`.
+/// Build the shared Antidote application with the default Supabase config
+/// (production publishable key + project URL). Use this from production
+/// shells.
 pub fn build_antidote_app() -> App {
-    let model: SharedModel = shared();
+    build_antidote_app_with_config(SupabaseConfig::antidote_default())
+}
+
+/// Same as [`build_antidote_app`] but with a caller-supplied Supabase
+/// config. Tests + alternate deployments use this entry point.
+pub fn build_antidote_app_with_config(config: SupabaseConfig) -> App {
+    let model: SharedModel = shared_with_config(config);
     let font = load_default_font();
 
     let game_canvas = GameWidget::new(model.clone());
     let hud = HudWidget::new(model.clone(), font.clone());
     let main_menu = MainMenuOverlay::new(model.clone(), font.clone());
+    let sign_in = SignInOverlay::new(model.clone(), font.clone());
+    let leaderboard = LeaderboardOverlay::new(model.clone(), font.clone());
+    let other_games = OtherGamesOverlay::new(model.clone(), font.clone());
     let life_lost = LifeLostOverlay::new(model.clone(), font.clone());
     let level_complete = LevelCompleteOverlay::new(model.clone(), font.clone());
     let game_over = GameOverOverlay::new(model.clone(), font.clone());
@@ -60,12 +73,17 @@ pub fn build_antidote_app() -> App {
     // Z-order matters here: front-to-back in painting, back-to-front in hit
     // testing. Game canvas is at the bottom; pause overlay (which the player
     // can summon at any time) sits on top so its buttons win over any other
-    // overlay when phase happens to coincide.
+    // overlay when phase happens to coincide. The sign-in / leaderboard /
+    // other-games overlays live above the main menu so their buttons win
+    // when their `MenuView` is active.
     let root = OverlayStack::new()
         .add(Box::new(game_canvas))
         .add(Box::new(hud))
         .add(Box::new(life_lost))
         .add(Box::new(main_menu))
+        .add(Box::new(sign_in))
+        .add(Box::new(leaderboard))
+        .add(Box::new(other_games))
         .add(Box::new(level_complete))
         .add(Box::new(game_over))
         .add(Box::new(pause));
@@ -77,6 +95,61 @@ pub fn build_antidote_app() -> App {
     app.set_global_key_handler(move |key, _mods| toggle_pause_on_key(&key_model, &key));
 
     app
+}
+
+/// Drain queued REST responses from the db inbox into the shared model.
+/// Call once per frame from the platform shell (or from a low-stack widget
+/// that is guaranteed to paint every frame). Idempotent and cheap when the
+/// inbox is empty.
+pub fn drain_db_inbox(model: &SharedModel) {
+    // Snapshot drained events under a short borrow so callbacks down below
+    // (which take borrow_mut) don't collide.
+    let mut events: Vec<DbInboxEvent> = Vec::new();
+    {
+        let m = model.borrow();
+        while let Ok(e) = m.services.inbox.rx.try_recv() {
+            events.push(e);
+        }
+    }
+    if events.is_empty() {
+        return;
+    }
+    let mut m = model.borrow_mut();
+    for e in events {
+        match e {
+            DbInboxEvent::SignInResult(Ok(s)) | DbInboxEvent::SignUpResult(Ok(s)) => {
+                m.services
+                    .postgrest
+                    .set_access_token(Some(s.access_token.clone()));
+                m.auth.record_session(s);
+                // Successful sign-in returns the user to the main menu so
+                // they see their email + Sign-out button.
+                m.menu_view = MenuView::Main;
+                // Future: persist via `Storage::save_session(&s)`.
+            }
+            DbInboxEvent::SignInResult(Err(err)) | DbInboxEvent::SignUpResult(Err(err)) => {
+                m.auth.record_error(err);
+            }
+            DbInboxEvent::GamesList(Ok(games)) => {
+                m.menu_caches.games = Some(games);
+                m.menu_caches.games_pending = false;
+                m.menu_caches.games_error = None;
+            }
+            DbInboxEvent::GamesList(Err(err)) => {
+                m.menu_caches.games_pending = false;
+                m.menu_caches.games_error = Some(err);
+            }
+            DbInboxEvent::TopScoresList(Ok(rows)) => {
+                m.menu_caches.top_scores = Some(rows);
+                m.menu_caches.top_scores_pending = false;
+                m.menu_caches.top_scores_error = None;
+            }
+            DbInboxEvent::TopScoresList(Err(err)) => {
+                m.menu_caches.top_scores_pending = false;
+                m.menu_caches.top_scores_error = Some(err);
+            }
+        }
+    }
 }
 
 /// Returns true when this key produced a phase change.

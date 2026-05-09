@@ -106,6 +106,12 @@ impl Widget for GameWidget {
     }
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
+        // GameWidget is the lowest-z child of the OverlayStack root, so its
+        // paint runs every frame regardless of phase. Drain any REST inbox
+        // events here so the rest of the tree sees up-to-date auth / cache
+        // state in their own paints later in the frame.
+        crate::ui::drain_db_inbox(&self.model);
+
         let mut model = self.model.borrow_mut();
         let now = Instant::now();
         let elapsed = match model.last_paint {

@@ -1,6 +1,6 @@
 //! Platform-injected services. Both shells (native, wasm) implement these.
 
-use crate::db::auth::Session;
+use crate::db::inbox::Session;
 
 /// Persists the auth session — JSON file on native, `localStorage` in wasm.
 pub trait Storage: Send + Sync {
