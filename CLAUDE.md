@@ -4,6 +4,11 @@
 
 - 4-crate workspace: `antidote-core` (logic+widgets), `antidote-native` (winit + wgpu), `antidote-wasm` (cdylib), `demo/` (TS shell). Mirrors `agg-gui`'s demo-* pattern.
 - `antidote-core` MUST stay `wasm32`-clean. No `tokio`, no `dotenvy`, no `dirs`, no `winit`, no `wgpu`. Both shells inject services through traits in `antidote_core::platform`.
+- `antidote-native` and `antidote-wasm` are **platform shells only**. They wire up the OS/browser window or canvas, wgpu surface, event loop, input forwarding, and platform persistence. They contain **no game or UI content**: every game rule, widget tree, menu, layout, HUD, dialog, leaderboard, and interface the user sees is shared via `antidote-core`. Platform crates call shared builders such as `antidote_core::ui::build_antidote_app()` and forward events; they never construct screens or widgets directly.
+- Platform split, copied from agg-gui's goal:
+  - **Game / widget / layout code** → `antidote-core`
+  - **GPU renderers (WGSL shaders, geometry, draw calls)** → `demo-wgpu` / future `agg-gui` wgpu backend
+  - **Platform shell (OS window or browser canvas + event forwarding + persistence backend)** → `antidote-native` and `antidote-wasm`
 - Y-up: agg-gui is Y-up first-quadrant; the JS reference is Y-down. The flip happens once at the GameWidget boundary in `antidote_core::render::scene::flip_y` — every helper inside `render::scene` works in JS-style Y-down coordinates.
 - **Physics: rapier2d.** Don't replace it with a hand-rolled integrator. Body parameters (density, friction, restitution, damping, CCD) match `reference/GFG/public/games/antidote/antidote-physics.js` exactly. PIXELS_PER_METER = 30.
 - **Rendering: pixel-faithful reproduction of the JS Canvas.** Every gradient stop, alpha, line width, eye offset, spike orbit, wobble, ease curve, and pop-animation timing must match `reference/GFG/public/games/antidote/antidote-rendering.js`. When in doubt, run the JS reference side-by-side and compare frames.

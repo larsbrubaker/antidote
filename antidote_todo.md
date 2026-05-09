@@ -22,17 +22,17 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 
 **Sub-steps (ordered):**
 
-1. **Done — Swap softbuffer → wgpu in `antidote-native`.** Cribbed the wgpu setup from `agg-gui/demo-native/src/main.rs` (Gpu struct, Surface, RENDER_ATTACHMENT format pick). The existing software `Framebuffer` is now uploaded as a fullscreen RGBA8 texture and drawn with a tiny WGSL shader (`textureSample` of a screen-sized texture). Same visual output as before, but the wgpu device/surface/queue is now in our hand for steps 2+. Eliminates the softbuffer present cost (~2 ms/frame).
+1. **Done — Swap softbuffer → wgpu in `antidote-native`.** Cribbed the wgpu setup from `agg-gui/demo-native/src/main.rs` (Gpu struct, Surface, RENDER_ATTACHMENT format pick). The first pass uploaded the software `Framebuffer` as a fullscreen RGBA8 texture; the shell now goes further and paints through `demo_wgpu::WgpuGfxCtx` directly. The wgpu device/surface/queue are in our hand for the rest of Phase 1.
 
-2. **Add a hardware `DrawCtx` impl in agg-gui.** Lives in `agg-gui/agg-gui/src/wgpu_gfx_ctx.rs` (new module) or as a sibling crate `agg-gui-wgpu`. Implements the same `DrawCtx` trait so callers don't change. Initially supports only the primitives game sprites need:
+2. **Done for native — use a hardware `DrawCtx` impl.** Antidote now depends on the existing sibling `../agg-gui/demo-wgpu` crate and drives `WgpuGfxCtx`, the same `DrawCtx` backend used by the agg-gui wgpu demo. Longer-term this backend may move under `agg-gui/agg-gui/src/…` or a published `agg-gui-wgpu` crate, but callers already use the normal `DrawCtx` trait. The sprite primitives we rely on are covered:
    - **filled circle** with optional outline (matches `ctx.circle(x, y, r) + fill/stroke`).
    - **radial gradient fill** with N color stops + spread mode.
-   - **halo-AA outline** — port the existing AGG halo trick to a WGSL fragment shader (signed distance + smoothstep over 1.0 px).
+   - **AA outline** via the wgpu backend's tessellated AA path.
    - **alpha blending** with global alpha matching the software pipeline byte-for-byte.
 
-   Each primitive is one draw call (instanced quads, vertex shader expands a unit quad into a circle bounding box; fragment shader does the AA + gradient sampling). State changes (fill color, gradient, line width) batch into a uniform buffer per-frame.
+   Follow-up optimization: replace generic path tessellation for sprite circles/rings with the planned instanced quad + WGSL signed-distance shader path if profiling shows the current wgpu backend is still too expensive.
 
-3. **Route game sprites through the hardware path.** The existing `render::scene::paint_*` helpers already use the `DrawCtx` API; they just call into the new wgpu-backed impl. No changes to `paint_bubble` / `paint_virus` / `paint_dying_virus` / `paint_pop_animation` source — they paint the same calls onto a different backend.
+3. **Done for native — route game sprites through the hardware path.** The existing `render::scene::paint_*` helpers already use the `DrawCtx` API, so no changes were needed in `paint_bubble` / `paint_virus` / `paint_dying_virus` / `paint_pop_animation`; they now paint onto `WgpuGfxCtx` in `antidote-native`.
 
 4. **Composite chrome widgets via a software → texture path.** `agg_gui::App::paint` already paints widget sub-trees into back-buffer textures (the `BackbufferState` / `BackbufferCache` machinery). Once the chrome widget tree paints into its cached AGG framebuffer, the wgpu `DrawCtx` uploads that bitmap once per dirty frame and draws it as a textured quad alongside the game sprites. Text + menus continue to look exactly like today; they just ride on top of the GPU now.
 
@@ -140,5 +140,6 @@ After Phase 1 ships, much of this becomes irrelevant — game sprites won't go t
 
 - New agg-gui features land in `../agg-gui/agg-gui/src/…` directly, not as workarounds in antidote (see CLAUDE.md "Local development uses agg-gui as a path dep").
 - `antidote-core` stays target-agnostic — no `tokio`, no `dotenvy`, no `winit`, no `wgpu` direct deps. Both shells inject services through the `platform::Storage` trait family.
+- `antidote-native` and `antidote-wasm` are platform shells only. All game rules, widget trees, menus, layouts, HUDs, dialogs, leaderboards, and visible UI live in `antidote-core`; shells only create the OS/browser surface, initialize the renderer, forward input, and provide platform services. Match agg-gui's split: **Game / widget / layout code** → `antidote-core`; **GPU renderers** → `demo-wgpu` / agg-gui wgpu backend; **platform shell** → native + wasm crates.
 - The JS reference at `reference/GFG/` is read-only documentation. Constants in `antidote-core/src/consts.rs` are the canonical Rust copies.
 - Commit straight to the antidote repo's `main` — no feature branches, no worktrees. (Same convention as rust-apps superproject.)
