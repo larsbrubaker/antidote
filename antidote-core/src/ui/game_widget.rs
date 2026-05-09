@@ -1,12 +1,13 @@
 //! `GameWidget` — the 800×600 letterboxed play area.
 
 use agg_gui::geometry::Size;
-use agg_gui::{DrawCtx, Event, EventResult, Point, Rect, Widget};
+use agg_gui::{DrawCtx, Event, EventResult, MouseButton, Point, Rect, Widget};
 use web_time::Instant;
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::physics::PhysicsWorld;
 use crate::game::state::World;
+use crate::game::update;
 use crate::render::scene;
 
 pub struct GameWidget {
@@ -16,16 +17,22 @@ pub struct GameWidget {
     pub physics: PhysicsWorld,
     /// Wall-clock start; used to compute a monotonic time for animations.
     epoch: Instant,
+    /// Last `paint` time; used to compute the per-frame `dt` for `tick`.
+    last_paint: Option<Instant>,
 }
 
 impl GameWidget {
     pub fn new() -> Self {
+        let mut world = World::new();
+        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        crate::game::level::init_level(&mut world, &mut physics);
         Self {
             bounds: Rect::new(0.0, 0.0, VIRTUAL_WIDTH as f64, VIRTUAL_HEIGHT as f64),
             children: Vec::new(),
-            world: World::new(),
-            physics: PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT),
+            world,
+            physics,
             epoch: Instant::now(),
+            last_paint: None,
         }
     }
 
@@ -53,7 +60,6 @@ impl GameWidget {
 
     /// Map an event point (widget-local Y-up pixels) to JS-style logical
     /// coordinates (0..VIRTUAL_WIDTH, 0..VIRTUAL_HEIGHT, Y-down).
-    #[allow(dead_code)] // M2-G wires this up
     fn event_to_logical(&self, p: Point) -> Option<(f32, f32)> {
         let lb = self.letterbox();
         if lb.scale <= 0.0 {
@@ -108,6 +114,15 @@ impl Widget for GameWidget {
     }
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
+        let now = Instant::now();
+        let dt = match self.last_paint {
+            Some(prev) => (now - prev).as_secs_f32().min(0.1), // cap dt at 100 ms
+            None => 1.0 / 60.0,
+        };
+        self.last_paint = Some(now);
+
+        update::tick(&mut self.world, &mut self.physics, dt);
+
         let lb = self.letterbox();
         let time_seconds = self.epoch.elapsed().as_secs_f32();
 
@@ -142,8 +157,37 @@ impl Widget for GameWidget {
         ctx.restore();
     }
 
-    fn on_event(&mut self, _event: &Event) -> EventResult {
-        // M2-G wires growBubble + pointer handlers here.
+    fn on_event(&mut self, event: &Event) -> EventResult {
+        match event {
+            Event::MouseDown {
+                pos,
+                button: MouseButton::Left,
+                ..
+            } => {
+                if let Some((x, y)) = self.event_to_logical(*pos) {
+                    update::on_pointer_down(&mut self.world, &mut self.physics, x, y);
+                    return EventResult::Consumed;
+                }
+            }
+            Event::MouseMove { pos } => {
+                if let Some((x, y)) = self.event_to_logical(*pos) {
+                    update::on_pointer_move(&mut self.world, x, y);
+                }
+            }
+            Event::MouseUp {
+                button: MouseButton::Left,
+                ..
+            } => {
+                update::on_pointer_up(&mut self.world, &mut self.physics);
+                return EventResult::Consumed;
+            }
+            _ => {}
+        }
         EventResult::Ignored
+    }
+
+    fn needs_draw(&self) -> bool {
+        // Continuous animation — always request a redraw.
+        true
     }
 }

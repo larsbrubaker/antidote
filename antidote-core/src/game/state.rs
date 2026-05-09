@@ -5,6 +5,12 @@ use rapier2d::prelude::RigidBodyHandle;
 
 use crate::consts::{BASE_ANTIDOTE_TIME, BASE_LIVES};
 
+/// Game-level constants: per-level antidote time = `BASE_ANTIDOTE_TIME + level * 2`.
+/// Stored on `World` because pause/resume needs it preserved.
+pub fn total_antidote_time_for(level: u32) -> f32 {
+    BASE_ANTIDOTE_TIME + level as f32 * 2.0
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     Start,
@@ -97,7 +103,9 @@ pub struct World {
     pub phase: Phase,
     pub level: u32,
     pub lives: u8,
+    /// Antidote remaining as a fraction of `total_antidote_time` (0.0..1.0).
     pub antidote: f32,
+    pub total_antidote_time: f32,
     pub total_score: u64,
     pub viruses: Vec<Virus>,
     pub solid_bubbles: Vec<Bubble>,
@@ -105,6 +113,13 @@ pub struct World {
     pub dying_viruses: Vec<DyingVirus>,
     pub pop_animations: Vec<PopAnimation>,
     pub growing: Option<GrowingBubble>,
+    /// Latest pointer position in JS-style logical coords.
+    pub pointer_x: f32,
+    pub pointer_y: f32,
+    pub pointer_down: bool,
+    /// Set true once the slide-out min antidote cost has been charged for the
+    /// current growing bubble. Mirrors `slideOutCharged` in the JS reference.
+    pub slide_out_charged: bool,
 }
 
 impl World {
@@ -113,7 +128,8 @@ impl World {
             phase: Phase::Start,
             level: 1,
             lives: BASE_LIVES,
-            antidote: BASE_ANTIDOTE_TIME,
+            antidote: 1.0,
+            total_antidote_time: BASE_ANTIDOTE_TIME,
             total_score: 0,
             viruses: Vec::new(),
             solid_bubbles: Vec::new(),
@@ -121,6 +137,10 @@ impl World {
             dying_viruses: Vec::new(),
             pop_animations: Vec::new(),
             growing: None,
+            pointer_x: 0.0,
+            pointer_y: 0.0,
+            pointer_down: false,
+            slide_out_charged: false,
         }
     }
 }

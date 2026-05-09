@@ -308,6 +308,14 @@ impl PhysicsWorld {
         handle
     }
 
+    /// Force a body's translation in pixels. Used to keep the growing-bubble
+    /// physics body at the pointer position each frame.
+    pub fn set_body_position(&mut self, handle: RigidBodyHandle, x: f32, y: f32) {
+        if let Some(rb) = self.bodies.get_mut(handle) {
+            rb.set_translation(vector![to_meters(x), to_meters(y)], true);
+        }
+    }
+
     /// Replace the growing-bubble's collider with a new one of the given radius.
     /// Mirrors `updateGrowingBubbleRadius` in the JS reference.
     pub fn resize_growing_bubble_collider(&mut self, handle: RigidBodyHandle, new_radius: f32) {
