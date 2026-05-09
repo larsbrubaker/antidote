@@ -23,9 +23,13 @@ async function main() {
   const canvas = document.getElementById("antidote-canvas") as HTMLCanvasElement | null;
   if (!canvas) throw new Error("missing #antidote-canvas");
 
-  const baseUrl = import.meta.env.BASE_URL;
-  const wasm = await import(/* @vite-ignore */ `${baseUrl}pkg/antidote_wasm.js`);
-  await wasm.default(`${baseUrl}pkg/antidote_wasm_bg.wasm`);
+  // The production bundle lives under `assets/`, while Vite copies
+  // `public/pkg` to the site root. Resolve through `import.meta.url` so both
+  // dev (`/src/main.ts`) and Pages (`/assets/index-*.js`) find `/pkg`.
+  const wasmJsUrl = new URL("../pkg/antidote_wasm.js", import.meta.url).href;
+  const wasmBgUrl = new URL("../pkg/antidote_wasm_bg.wasm", import.meta.url).href;
+  const wasm = await import(/* @vite-ignore */ wasmJsUrl);
+  await wasm.default(wasmBgUrl);
 
   const resizeCanvas = () => {
     const dpr = Math.max(0.5, window.devicePixelRatio || 1);

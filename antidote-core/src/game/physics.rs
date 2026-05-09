@@ -16,6 +16,7 @@ use crate::consts::{
 };
 use crate::game::state::{Bubble, DeadVirus, GrowingBubble, Virus, World};
 use rapier2d::prelude::*;
+use std::num::NonZeroUsize;
 
 /// Collision-filter categories. Match the JS reference's bitmasks exactly.
 pub mod category {
@@ -104,10 +105,12 @@ pub struct PhysicsWorld {
 
 impl PhysicsWorld {
     pub fn new(game_width: f32, game_height: f32) -> Self {
-        // Per-step `dt` is overridden in `step()`. JS reference's exact iteration
-        // counts (8 velocity, 3 position) don't map cleanly to rapier's unified
-        // solver; defaults are close enough for the gameplay feel.
-        let integration_parameters = IntegrationParameters::default();
+        // Per-step `dt` is overridden in `step()`. Match Box2D's 8 velocity
+        // iterations as closely as Rapier's unified solver exposes.
+        let integration_parameters = IntegrationParameters {
+            num_solver_iterations: NonZeroUsize::new(8).expect("non-zero solver iterations"),
+            ..IntegrationParameters::default()
+        };
 
         let mut world = Self {
             gravity: vector![0.0, 0.0],
@@ -168,6 +171,8 @@ impl PhysicsWorld {
             let collider = ColliderBuilder::cuboid(hex, hey)
                 .friction(0.1)
                 .restitution(0.3)
+                .friction_combine_rule(CoefficientCombineRule::Min)
+                .restitution_combine_rule(CoefficientCombineRule::Max)
                 .collision_groups(groups)
                 .build();
             self.colliders
@@ -220,6 +225,8 @@ impl PhysicsWorld {
             .density(1.0)
             .friction(0.0)
             .restitution(1.0)
+            .friction_combine_rule(CoefficientCombineRule::Min)
+            .restitution_combine_rule(CoefficientCombineRule::Max)
             .collision_groups(InteractionGroups::new(
                 category::VIRUS,
                 category::WALL
@@ -249,6 +256,8 @@ impl PhysicsWorld {
             .density(0.5)
             .friction(0.1)
             .restitution(0.4)
+            .friction_combine_rule(CoefficientCombineRule::Min)
+            .restitution_combine_rule(CoefficientCombineRule::Max)
             .collision_groups(InteractionGroups::new(
                 category::BUBBLE,
                 category::WALL | category::BUBBLE | category::VIRUS | category::DEAD_VIRUS,
@@ -274,6 +283,8 @@ impl PhysicsWorld {
             .density(2.0)
             .friction(0.5)
             .restitution(0.1)
+            .friction_combine_rule(CoefficientCombineRule::Min)
+            .restitution_combine_rule(CoefficientCombineRule::Max)
             .collision_groups(InteractionGroups::new(
                 category::DEAD_VIRUS,
                 category::WALL | category::BUBBLE | category::VIRUS | category::DEAD_VIRUS,
@@ -297,6 +308,8 @@ impl PhysicsWorld {
             .density(0.1)
             .friction(0.1)
             .restitution(0.0)
+            .friction_combine_rule(CoefficientCombineRule::Min)
+            .restitution_combine_rule(CoefficientCombineRule::Max)
             .collision_groups(InteractionGroups::new(
                 category::GROWING_BUBBLE,
                 category::WALL | category::VIRUS,
@@ -329,6 +342,8 @@ impl PhysicsWorld {
             .density(0.1)
             .friction(0.1)
             .restitution(0.0)
+            .friction_combine_rule(CoefficientCombineRule::Min)
+            .restitution_combine_rule(CoefficientCombineRule::Max)
             .collision_groups(InteractionGroups::new(
                 category::GROWING_BUBBLE,
                 category::WALL | category::VIRUS,
@@ -528,5 +543,47 @@ mod tests {
         }
         phys.sync_to_world(&mut world);
         assert!(world.viruses[0].x > 200.0, "virus did not move right");
+    }
+
+    #[test]
+    fn virus_collision_pushes_solid_bubble() {
+        let mut phys = PhysicsWorld::new(800.0, 600.0);
+        let mut world = World::new();
+
+        world.solid_bubbles.push(Bubble {
+            x: 300.0,
+            y: 300.0,
+            radius: 30.0,
+            vx: 0.0,
+            vy: 0.0,
+            body: None,
+        });
+        phys.spawn_bubble_body(&mut world.solid_bubbles[0]);
+
+        world.viruses.push(Virus {
+            x: 240.0,
+            y: 300.0,
+            vx: 120.0,
+            vy: 0.0,
+            phase: 0.0,
+            last_unstuck_x: 240.0,
+            last_unstuck_y: 300.0,
+            stuck_time: 0.0,
+            speed: 120.0,
+            body: None,
+        });
+        phys.spawn_virus_body(&mut world.viruses[0], crate::consts::VIRUS_RADIUS);
+
+        for _ in 0..45 {
+            phys.step(1.0 / 60.0);
+            phys.sync_to_world(&mut world);
+            phys.maintain_virus_speeds(&mut world, 120.0);
+        }
+
+        assert!(
+            world.solid_bubbles[0].x > 302.0,
+            "virus did not transfer visible momentum to bubble: x={}",
+            world.solid_bubbles[0].x
+        );
     }
 }

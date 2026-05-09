@@ -29,7 +29,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo fmt --check
-        run: cargo fmt --all -- --check
+        # Keep rustfmt scoped to Antidote packages. The CI checkout also places
+        # agg-gui beside this repo for path dependencies; `cargo fmt --all`
+        # would fail this repo's CI on unrelated formatting in that sibling.
+        run: cargo fmt --package antidote-core --package antidote-native --package antidote-wasm -- --check
 
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
