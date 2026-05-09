@@ -43,8 +43,8 @@ pub fn correct_wall_slide_velocity(
     let mut corrected = false;
 
     // perp = ratio * parallel / sqrt(1 - ratio^2)
-    let factor = MIN_PERPENDICULAR_RATIO
-        / (1.0 - MIN_PERPENDICULAR_RATIO * MIN_PERPENDICULAR_RATIO).sqrt();
+    let factor =
+        MIN_PERPENDICULAR_RATIO / (1.0 - MIN_PERPENDICULAR_RATIO * MIN_PERPENDICULAR_RATIO).sqrt();
 
     if x < WALL_PROXIMITY_THRESHOLD && (vx / speed) < MIN_PERPENDICULAR_RATIO {
         cvx = cvy.abs() * factor;

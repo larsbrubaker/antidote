@@ -12,7 +12,9 @@
 //! JS-style Y-down coordinates.
 
 use crate::consts::VIRTUAL_HEIGHT;
-use crate::game::state::{Bubble, DeadVirus, DyingVirus, GrowingBubble, PopAnimation, Virus, World};
+use crate::game::state::{
+    Bubble, DeadVirus, DyingVirus, GrowingBubble, PopAnimation, Virus, World,
+};
 
 #[inline]
 pub fn flip_y(y: f32) -> f32 {
