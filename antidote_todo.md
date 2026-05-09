@@ -22,7 +22,7 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 
 **Sub-steps (ordered):**
 
-1. **Swap softbuffer → wgpu in `antidote-native`.** Crib the wgpu setup from `agg-gui/demo-native/src/main.rs` (Gpu struct, Surface, RENDER_ATTACHMENT format pick). Render the existing `Framebuffer` as a fullscreen textured quad with a tiny WGSL shader (`textureSample` of a screen-sized RGBA8 texture). Same visual output as today, but the wgpu device/surface/queue is now in our hand for steps 2+. Eliminates the softbuffer present cost (~2 ms/frame).
+1. **Done — Swap softbuffer → wgpu in `antidote-native`.** Cribbed the wgpu setup from `agg-gui/demo-native/src/main.rs` (Gpu struct, Surface, RENDER_ATTACHMENT format pick). The existing software `Framebuffer` is now uploaded as a fullscreen RGBA8 texture and drawn with a tiny WGSL shader (`textureSample` of a screen-sized texture). Same visual output as before, but the wgpu device/surface/queue is now in our hand for steps 2+. Eliminates the softbuffer present cost (~2 ms/frame).
 
 2. **Add a hardware `DrawCtx` impl in agg-gui.** Lives in `agg-gui/agg-gui/src/wgpu_gfx_ctx.rs` (new module) or as a sibling crate `agg-gui-wgpu`. Implements the same `DrawCtx` trait so callers don't change. Initially supports only the primitives game sprites need:
    - **filled circle** with optional outline (matches `ctx.circle(x, y, r) + fill/stroke`).

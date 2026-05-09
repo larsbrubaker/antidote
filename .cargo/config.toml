@@ -1,0 +1,16 @@
+[alias]
+dev = [
+    "watch",
+    "-i",
+    "target",
+    "-i",
+    "demo",
+    "-i",
+    "db",
+    "-i",
+    "antidote-wasm",
+    "-i",
+    "reference",
+    "-x",
+    "run -p antidote-native",
+]

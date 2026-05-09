@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Native (winit + software-rasterized agg-gui) shell for the Antidote game."
+description = "Native (winit + wgpu-presented agg-gui) shell for the Antidote game."
 
 [dependencies]
 antidote-core = { path = "../antidote-core" }
@@ -17,5 +17,7 @@ tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
 flume = "0.11"
 dotenvy = "0.15"
 dirs = "5"
-softbuffer = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+pollster = "0.4"
+wgpu = { version = "29", default-features = false, features = ["wgsl", "vulkan", "dx12", "metal"] }
 winit = "0.30"

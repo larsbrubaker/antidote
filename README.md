@@ -10,8 +10,10 @@ Held pointer grows an antidote bubble; bouncing viruses get trapped if they can'
 
 ```bash
 # Native
-cp .env.example .env       # fill in SUPABASE_ANON_KEY
+cp .env.example .env          # fill in SUPABASE_ANON_KEY
 cargo run -p antidote-native
+cargo install cargo-watch     # one-time install for watch mode
+cargo dev                     # rebuilds and reruns antidote-native on changes
 
 # WebAssembly
 wasm-pack build antidote-wasm --target web --out-dir ../demo/public/pkg --no-typescript
