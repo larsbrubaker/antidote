@@ -7,7 +7,8 @@ type RuntimeConfig = {
 };
 
 async function loadConfig(): Promise<RuntimeConfig> {
-  const resp = await fetch("/runtime-config.json", { cache: "no-store" });
+  // Relative path so this works under any base URL (e.g. larsbrubaker.github.io/antidote/).
+  const resp = await fetch("runtime-config.json", { cache: "no-store" });
   if (!resp.ok) throw new Error(`runtime-config.json missing: ${resp.status}`);
   return await resp.json();
 }

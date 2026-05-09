@@ -19,13 +19,13 @@ web-time = "1"
 rapier2d = "0.22"
 
 # ---------------------------------------------------------------------------
-# Local development overrides
+# Local development override — see CLAUDE.md "Local development uses agg-gui
+# as a path dep". The rust-apps superproject lays out agg-gui as a sibling at
+# ../agg-gui/. CI clones it the same way (see .github/workflows/ci.yml +
+# deploy-demo.yml) so this patch resolves both locally and in Actions.
 # ---------------------------------------------------------------------------
-# Uncomment to develop against a local agg-gui checkout next door (via the
-# rust-apps superproject layout). CI builds against crates.io.
-#
-# [patch.crates-io]
-# agg-gui = { path = "../agg-gui/agg-gui" }
+[patch.crates-io]
+agg-gui = { path = "../agg-gui/agg-gui" }
 
 # ---------------------------------------------------------------------------
 # Optimize dependencies in debug builds. The agg-rust software rasterizer +
