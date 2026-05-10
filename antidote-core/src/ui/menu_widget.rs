@@ -19,7 +19,7 @@ use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
 use crate::game::state::{Phase, World};
 use crate::game::update;
-use crate::ui::game_model::{MenuView, SharedModel};
+use crate::ui::game_model::SharedModel;
 
 /// Width of the centered column that holds the menu widgets.
 pub const COL_W: f64 = 360.0;
@@ -120,11 +120,9 @@ pub fn secondary_button(
 }
 
 /// Reset world to a fresh "level 1, full lives, zero score" state without
-/// leaking rapier bodies. Also resets the score-sync tracker so the next
-/// `LevelComplete` / `GameOver` records the full new session.
+/// leaking rapier bodies.
 fn reset_to_start(model: &SharedModel) {
     let mut m = model.borrow_mut();
-    m.reset_score_sync();
     let m = &mut *m;
     m.physics = crate::game::physics::PhysicsWorld::new(
         crate::consts::VIRTUAL_WIDTH,
@@ -145,9 +143,6 @@ pub struct MainMenuOverlay {
 impl MainMenuOverlay {
     pub fn new(model: SharedModel, font: Arc<Font>) -> Self {
         let play_model = model.clone();
-        let signin_model = model.clone();
-        let leaderboard_model = model.clone();
-        let other_games_model = model.clone();
         let children: Vec<Box<dyn Widget>> = vec![
             header_label("Antidote", font.clone(), 36.0),
             body_label(
@@ -155,30 +150,17 @@ impl MainMenuOverlay {
                 font.clone(),
                 Some(Color::rgba(0.75, 0.82, 0.95, 1.0)),
             ),
-            primary_button("Play", font.clone(), move || {
+            // Best-score label. `refresh_dynamic_text` rewrites the value
+            // every layout pass.
+            body_label(
+                "Best: 0",
+                font.clone(),
+                Some(Color::rgba(0.95, 0.85, 0.45, 1.0)),
+            ),
+            primary_button("Play", font, move || {
                 let mut m = play_model.borrow_mut();
-                m.reset_score_sync();
                 let m = &mut *m;
                 update::start_new_game(&mut m.world, &mut m.physics);
-            }),
-            // The signed-out / signed-in label rotates between "Sign in" and
-            // "Sign out (you@example.com)". `refresh_dynamic_text` rewrites
-            // the label every layout pass.
-            secondary_button("Sign in", font.clone(), move || {
-                let mut m = signin_model.borrow_mut();
-                if m.auth.session.is_some() {
-                    // Signed in already — sign out.
-                    m.auth.session = None;
-                    m.services.postgrest.set_access_token(None);
-                } else {
-                    m.menu_view = MenuView::SignIn;
-                }
-            }),
-            secondary_button("Leaderboard", font.clone(), move || {
-                leaderboard_model.borrow_mut().menu_view = MenuView::Leaderboard;
-            }),
-            secondary_button("Other games", font, move || {
-                other_games_model.borrow_mut().menu_view = MenuView::OtherGames;
             }),
         ];
         Self {
@@ -188,17 +170,11 @@ impl MainMenuOverlay {
         }
     }
 
-    /// Update the sign-in button label to reflect signed-in state, since
-    /// the same button toggles between sign-in and sign-out.
+    /// Update the best-score label to reflect the latest persisted high.
     fn refresh_dynamic_text(&mut self) {
-        let label = match self.model.borrow().auth.session.as_ref() {
-            Some(s) => match &s.email {
-                Some(email) => format!("Sign out ({email})"),
-                None => "Sign out".to_owned(),
-            },
-            None => "Sign in".to_owned(),
-        };
-        self.children[3].set_label_text(&label);
+        let best = self.model.borrow().best_score;
+        let label = format!("Best: {best}");
+        self.children[2].set_label_text(&label);
     }
 }
 
@@ -219,8 +195,7 @@ impl Widget for MainMenuOverlay {
         &mut self.children
     }
     fn is_visible(&self) -> bool {
-        let m = self.model.borrow();
-        m.world.phase == Phase::Start && m.menu_view == MenuView::Main
+        self.model.borrow().world.phase == Phase::Start
     }
     fn layout(&mut self, available: Size) -> Size {
         self.refresh_dynamic_text();
@@ -428,7 +403,6 @@ impl GameOverOverlay {
             body_label("Final score: 0", font.clone(), None),
             primary_button("Play again", font.clone(), move || {
                 let mut m = again_model.borrow_mut();
-                m.reset_score_sync();
                 let m = &mut *m;
                 update::start_new_game(&mut m.world, &mut m.physics);
             }),

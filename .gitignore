@@ -5,14 +5,9 @@ Cargo.lock.bak
 # Local TS/Canvas reference of the original game; not part of the Rust port.
 /reference/
 
-.env
-.env.local
-*.session.json
-
 node_modules/
 demo/dist
 demo/public/pkg
-demo/public/runtime-config.json
 
 # OS
 .DS_Store

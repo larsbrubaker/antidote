@@ -17,16 +17,8 @@ test = false
 antidote-core = { path = "../antidote-core" }
 agg-gui = { workspace = true, features = ["winit-adapter", "clipboard"] }
 demo-wgpu = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { version = "1", features = ["rt", "macros", "time", "sync"] }
-flume = "0.11"
-dotenvy = "0.15"
 dirs = "5"
 pollster = "0.4"
 wgpu = { version = "29", default-features = false, features = ["wgsl", "vulkan", "dx12", "metal"] }
 winit = "0.30"
-# Used to launch the system browser for OAuth sign-in. We don't yet host
-# a localhost callback to catch the redirect tokens — native OAuth is a
-# one-way trip until that lands.
-webbrowser = "1"

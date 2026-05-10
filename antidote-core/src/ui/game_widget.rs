@@ -106,14 +106,6 @@ impl Widget for GameWidget {
     }
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
-        // GameWidget is the lowest-z child of the OverlayStack root, so its
-        // paint runs every frame regardless of phase. Drain any REST inbox
-        // events here so the rest of the tree sees up-to-date auth / cache
-        // state in their own paints later in the frame, then push score
-        // updates if the player just finalized a level or game.
-        crate::ui::drain_db_inbox(&self.model);
-        crate::ui::tick_score_sync(&self.model);
-
         let mut model = self.model.borrow_mut();
         let now = Instant::now();
         let elapsed = match model.last_paint {
@@ -128,6 +120,9 @@ impl Widget for GameWidget {
             let m = &mut *model;
             update::tick(&mut m.world, &mut m.physics, dt);
         }
+        // Persist a new best score if this tick beat the previous record.
+        // Cheap when called every frame — the comparison short-circuits.
+        model.maybe_record_best_score();
 
         let lb = self.letterbox();
         let time_seconds = model.epoch.elapsed().as_secs_f32();

@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use agg_gui::{winit_adapter, App, Modifiers, Size};
-use antidote_core::ui::build_antidote_app;
+use antidote_core::ui::build_antidote_app_with_store;
 use demo_wgpu::{begin_frame, WgpuGfxCtx};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, MouseScrollDelta, WindowEvent};
@@ -35,6 +35,8 @@ use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowAttributes};
 
 mod platform;
+
+use platform::FileBestScoreStore;
 
 struct Gpu {
     device: Arc<wgpu::Device>,
@@ -110,8 +112,6 @@ impl Gpu {
 }
 
 fn main() {
-    let _ = dotenvy::dotenv();
-
     let event_loop = EventLoop::new().expect("create event loop");
 
     let window_attributes = WindowAttributes::default()
@@ -133,7 +133,7 @@ fn main() {
 
     let mut gpu = Gpu::new(window.clone());
 
-    let (mut app, model) = build_antidote_app();
+    let (mut app, _model) = build_antidote_app_with_store(FileBestScoreStore::into_shared());
     let mut wgpu_ctx = WgpuGfxCtx::new(
         Arc::clone(&gpu.device),
         Arc::clone(&gpu.queue),
@@ -254,29 +254,6 @@ fn main() {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                // Drain pending OAuth click → URL into pending_open_url.
-                // For native there's no localhost callback yet, so we use a
-                // sentinel redirect that lands the user on a Supabase
-                // success page; they manually return to the app and (for
-                // now) sign in via email/password instead.
-                antidote_core::ui::drain_pending_oauth(
-                    &model,
-                    "https://edupgibalgeqfujfkwmm.supabase.co/auth/v1/callback",
-                );
-                // Recovery email link → bring the user to the deployed
-                // web app, which already knows how to handle the
-                // recovery hash and offer a "set new password" UI.
-                // (The native shell can't host that flow until we ship
-                // a localhost-loopback server, same constraint as OAuth.)
-                antidote_core::ui::drain_pending_password_reset(
-                    &model,
-                    "https://larsbrubaker.github.io/antidote/",
-                );
-                if let Some(url) = model.borrow_mut().pending_open_url.take() {
-                    if let Err(err) = webbrowser::open(&url) {
-                        eprintln!("antidote: failed to open browser for OAuth: {err}");
-                    }
-                }
                 if let Some(ms) = paint_frame(&gpu, &mut wgpu_ctx, &mut app, win_w, win_h) {
                     paint_time_sum_ms += ms;
                 }

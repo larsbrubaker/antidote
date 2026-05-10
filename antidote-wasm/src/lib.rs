@@ -30,14 +30,14 @@ use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use agg_gui::{App, Key, Modifiers, MouseButton};
-use antidote_core::ui::{build_antidote_app, game_model::SharedModel};
+use antidote_core::ui::build_antidote_app_with_store;
 use demo_wgpu::{begin_frame, WgpuGfxCtx};
+use platform::LocalStorageBestScoreStore;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
-    static MODEL: RefCell<Option<SharedModel>> = const { RefCell::new(None) };
     static WGPU_INIT: RefCell<Option<WgpuInit>> = const { RefCell::new(None) };
     static WGPU_CTX: RefCell<Option<WgpuGfxCtx>> = const { RefCell::new(None) };
     static NEEDS_DRAW: Cell<bool> = const { Cell::new(true) };
@@ -55,10 +55,9 @@ struct WgpuInit {
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();
-    // Build the App + SharedModel synchronously so `oauth_complete` (which
-    // the TS shell may call before the first `render()`) sees a populated
-    // MODEL. This doesn't need wgpu — `build_antidote_app` only
-    // constructs widgets and the GameModel.
+    // Build the App + SharedModel synchronously so the first render() finds
+    // a populated MODEL. This doesn't need wgpu — `build_antidote_app_with_store`
+    // only constructs widgets and the GameModel.
     ensure_app();
     wasm_bindgen_futures::spawn_local(async {
         match init_wgpu_async().await {
@@ -153,94 +152,13 @@ fn ensure_app() {
         if cell.borrow().is_some() {
             return;
         }
-        let (app, model) = build_antidote_app();
+        // The widget tree owns clones of the SharedModel internally, so we
+        // can drop our handle here — there's no longer any out-of-tree
+        // consumer that needs it.
+        let (app, _model) =
+            build_antidote_app_with_store(LocalStorageBestScoreStore::into_shared());
         *cell.borrow_mut() = Some(app);
-        MODEL.with(|m| *m.borrow_mut() = Some(model));
     });
-}
-
-/// Drain `pending_open_url` and redirect the page. The site's TS shell
-/// will catch the OAuth round-trip's `#access_token=...&...` fragment on
-/// reload and call `oauth_complete` below to install the session.
-fn drain_pending_open_url() {
-    let url: Option<String> = MODEL.with(|cell| {
-        cell.borrow()
-            .as_ref()
-            .and_then(|m| m.borrow_mut().pending_open_url.take())
-    });
-    let Some(url) = url else { return };
-    let Some(window) = web_sys::window() else {
-        return;
-    };
-    let _ = window.location().set_href(&url);
-}
-
-/// Drain the OAuth-button click signal into a `pending_open_url`, using
-/// the current page origin + path as the post-OAuth redirect target. Must
-/// be a value that's listed in the project's "Allowed redirect URLs"
-/// (Supabase Dashboard → Authentication → URL Configuration).
-fn drain_pending_oauth_with_origin() {
-    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
-    let Some(model) = model else { return };
-    let Some(window) = web_sys::window() else {
-        return;
-    };
-    let location = window.location();
-    let origin = location.origin().unwrap_or_default();
-    let pathname = location.pathname().unwrap_or_default();
-    let redirect_to = format!("{origin}{pathname}");
-    antidote_core::ui::drain_pending_oauth(&model, &redirect_to);
-}
-
-/// Drain the "Forgot password?" click signal — Supabase emails the user a
-/// `#access_token=...&type=recovery` link pointing at this URL.
-fn drain_pending_password_reset_with_origin() {
-    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
-    let Some(model) = model else { return };
-    let Some(window) = web_sys::window() else {
-        return;
-    };
-    let location = window.location();
-    let origin = location.origin().unwrap_or_default();
-    let pathname = location.pathname().unwrap_or_default();
-    let redirect_to = format!("{origin}{pathname}");
-    antidote_core::ui::drain_pending_password_reset(&model, &redirect_to);
-}
-
-/// Wasm-bindgen entry point the TS shell calls on page load when it
-/// detects an OAuth callback fragment in `window.location.hash`. The
-/// session is registered the same way email/password sign-ins land — via
-/// the db inbox — so the rest of the UI sees a fresh `auth.session`
-/// without any other special-casing.
-///
-/// Important: must call `ensure_app()` *before* reading `MODEL`. The TS
-/// shell invokes this immediately after `await wasm.default()`, before
-/// the rAF loop has a chance to fire its first `render()` (which is
-/// what normally populates `MODEL`). Without this call here the
-/// function silently no-ops and the OAuth tokens are dropped — the
-/// symptom Lars saw was a black screen with `#access_token=...` in the
-/// URL but no signed-in session.
-#[wasm_bindgen]
-pub fn oauth_complete(access_token: String, refresh_token: String, expires_in: i64) {
-    ensure_app();
-    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
-    let Some(model) = model else { return };
-    antidote_core::ui::record_oauth_session(&model, access_token, refresh_token, expires_in);
-    mark_dirty();
-}
-
-/// Enter password-reset mode after a recovery email link redirected the
-/// user back to the page. The TS shell calls this (not `oauth_complete`)
-/// when it spots `type=recovery` in the URL hash. The recovery token is
-/// stashed; the SetPasswordOverlay uses it to authorize a single
-/// `PUT /auth/v1/user` call, after which we install the session for real.
-#[wasm_bindgen]
-pub fn enter_recovery_mode(access_token: String, refresh_token: String, expires_in: i64) {
-    ensure_app();
-    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
-    let Some(model) = model else { return };
-    antidote_core::ui::record_recovery_token(&model, access_token, refresh_token, expires_in);
-    mark_dirty();
 }
 
 fn ensure_wgpu_ctx(width: f32, height: f32) {
@@ -287,9 +205,6 @@ pub fn render(width: u32, height: u32, _frame_ms: f64) {
         return;
     }
     ensure_app();
-    drain_pending_oauth_with_origin();
-    drain_pending_password_reset_with_origin();
-    drain_pending_open_url();
     ensure_wgpu_ctx(width as f32, height as f32);
     resize_surface_if_needed(width, height);
 

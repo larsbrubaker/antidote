@@ -14,33 +14,23 @@ use std::sync::Arc;
 use agg_gui::text::Font;
 use agg_gui::{App, Key};
 
-pub mod auth_widget;
 pub mod game_model;
 pub mod game_widget;
-pub mod google_signin_button;
 pub mod hud_widget;
-pub mod leaderboard_widget;
 pub mod life_lost_overlay;
 pub mod menu_widget;
-pub mod other_games_widget;
 pub mod overlay_stack;
-pub mod set_password_overlay;
 
-use crate::db::auth::AuthClient;
-use crate::db::inbox::{DbInboxEvent, Session};
 use crate::game::state::Phase;
-use auth_widget::SignInOverlay;
+use crate::platform::{in_memory_best_score_store, BestScoreStore};
 #[cfg(test)]
 use game_model::shared;
-use game_model::{shared_with_config, MenuView, SharedModel, SupabaseConfig};
+use game_model::{shared_with_store, SharedModel};
 use game_widget::GameWidget;
 use hud_widget::HudWidget;
-use leaderboard_widget::LeaderboardOverlay;
 use life_lost_overlay::LifeLostOverlay;
 use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseOverlay};
-use other_games_widget::OtherGamesOverlay;
 use overlay_stack::OverlayStack;
-use set_password_overlay::SetPasswordOverlay;
 
 /// CascadiaCode is bundled into the binary so neither shell has to ship a
 /// separate font file. ~388 KB; small enough for both native and wasm.
@@ -50,28 +40,23 @@ fn load_default_font() -> Arc<Font> {
     Arc::new(Font::from_slice(FONT_BYTES).expect("antidote default font"))
 }
 
-/// Build the shared Antidote application with the default Supabase config
-/// (production publishable key + project URL). Returns `(App, SharedModel)`
-/// — shells need the second value to drive `drain_db_inbox`,
-/// `tick_score_sync`, `drain_pending_oauth`, and the OAuth-callback
-/// session injection.
+/// Build the shared Antidote application with an in-memory best-score store.
+/// Tests use this; production shells pass a real platform-backed store via
+/// [`build_antidote_app_with_store`].
 pub fn build_antidote_app() -> (App, SharedModel) {
-    build_antidote_app_with_config(SupabaseConfig::antidote_default())
+    build_antidote_app_with_store(in_memory_best_score_store())
 }
 
-/// Same as [`build_antidote_app`] but with a caller-supplied Supabase
-/// config. Tests + alternate deployments use this entry point.
-pub fn build_antidote_app_with_config(config: SupabaseConfig) -> (App, SharedModel) {
-    let model: SharedModel = shared_with_config(config);
+/// Build the shared Antidote application with a caller-supplied best-score
+/// store. Returns `(App, SharedModel)` — shells keep the model handle so
+/// they can drive their own per-frame hooks.
+pub fn build_antidote_app_with_store(store: Arc<dyn BestScoreStore>) -> (App, SharedModel) {
+    let model: SharedModel = shared_with_store(store);
     let font = load_default_font();
 
     let game_canvas = GameWidget::new(model.clone());
     let hud = HudWidget::new(model.clone(), font.clone());
     let main_menu = MainMenuOverlay::new(model.clone(), font.clone());
-    let sign_in = SignInOverlay::new(model.clone(), font.clone());
-    let set_password = SetPasswordOverlay::new(model.clone(), font.clone());
-    let leaderboard = LeaderboardOverlay::new(model.clone(), font.clone());
-    let other_games = OtherGamesOverlay::new(model.clone(), font.clone());
     let life_lost = LifeLostOverlay::new(model.clone(), font.clone());
     let level_complete = LevelCompleteOverlay::new(model.clone(), font.clone());
     let game_over = GameOverOverlay::new(model.clone(), font.clone());
@@ -80,18 +65,12 @@ pub fn build_antidote_app_with_config(config: SupabaseConfig) -> (App, SharedMod
     // Z-order matters here: front-to-back in painting, back-to-front in hit
     // testing. Game canvas is at the bottom; pause overlay (which the player
     // can summon at any time) sits on top so its buttons win over any other
-    // overlay when phase happens to coincide. The sign-in / leaderboard /
-    // other-games overlays live above the main menu so their buttons win
-    // when their `MenuView` is active.
+    // overlay when phase happens to coincide.
     let root = OverlayStack::new()
         .add(Box::new(game_canvas))
         .add(Box::new(hud))
         .add(Box::new(life_lost))
         .add(Box::new(main_menu))
-        .add(Box::new(sign_in))
-        .add(Box::new(set_password))
-        .add(Box::new(leaderboard))
-        .add(Box::new(other_games))
         .add(Box::new(level_complete))
         .add(Box::new(game_over))
         .add(Box::new(pause));
@@ -103,254 +82,6 @@ pub fn build_antidote_app_with_config(config: SupabaseConfig) -> (App, SharedMod
     app.set_global_key_handler(move |key, _mods| toggle_pause_on_key(&key_model, &key));
 
     (app, model)
-}
-
-/// Drain the OAuth-button click signal, build a Supabase
-/// `/auth/v1/authorize` URL for the requested provider, and stash it in
-/// `pending_open_url` for the shell to actually navigate to. Call this
-/// from each platform shell once per frame, passing the redirect URL
-/// that's appropriate for that platform (e.g. on web the current page
-/// origin, on native a `localhost:PORT` callback).
-///
-/// This stays out of `tick_score_sync` / `drain_db_inbox` because the
-/// redirect URL is shell-specific — the core can't know it.
-pub fn drain_pending_oauth(model: &SharedModel, redirect_to: &str) {
-    let mut m = model.borrow_mut();
-    let Some(provider) = m.auth.pending_oauth.take() else {
-        return;
-    };
-    if m.services.config.url.is_empty() {
-        m.auth.last_error = Some("Supabase URL not configured".to_owned());
-        return;
-    }
-    let url = m.services.auth.oauth_url(provider, redirect_to);
-    m.pending_open_url = Some(url);
-}
-
-/// Drain the "Forgot password?" click signal — calls
-/// `/auth/v1/recover` with the email the user typed and the
-/// shell-supplied `redirect_to` (the URL Supabase sends the user to in
-/// the recovery email). Same shape as [`drain_pending_oauth`]: the email
-/// is consumed, so the click only fires once.
-pub fn drain_pending_password_reset(model: &SharedModel, redirect_to: &str) {
-    let mut m = model.borrow_mut();
-    let Some(email) = m.auth.pending_recover_email.take() else {
-        return;
-    };
-    if m.services.config.url.is_empty() {
-        m.auth.recover_pending = false;
-        m.auth.last_error = Some("Supabase URL not configured".to_owned());
-        return;
-    }
-    m.services
-        .auth
-        .request_password_reset_async(&email, redirect_to, &m.services.inbox);
-}
-
-/// Stash a recovery-flow access token (from a `type=recovery` callback
-/// URL) without yet treating the user as fully signed in. The
-/// `SetPasswordOverlay` reads this token, posts a new password to
-/// `PUT /auth/v1/user`, and only THEN (in the `PasswordUpdated(Ok(_))`
-/// drain branch) is the session installed for real. Until that point the
-/// user can't navigate elsewhere — the recovery session is a single-use
-/// token meant for resetting the password and nothing else.
-pub fn record_recovery_token(
-    model: &SharedModel,
-    access_token: String,
-    refresh_token: String,
-    expires_in: i64,
-) {
-    let mut m = model.borrow_mut();
-    m.auth.recovery_access_token = Some(access_token);
-    m.auth.recovery_refresh_token = Some(refresh_token);
-    m.auth.recovery_expires_in = Some(expires_in);
-    m.auth.last_error = None;
-    m.auth.notice = None;
-    m.menu_view = MenuView::SetPassword;
-}
-
-/// Record a session that arrived via an OAuth redirect (web) or local
-/// callback handler (native). Called by the platform shell after parsing
-/// `#access_token=...&refresh_token=...&expires_in=...` out of the
-/// callback URL. Pushes the same `DbInboxEvent::SignInResult(Ok(_))` the
-/// email/password path uses, so the regular drain hook handles all the
-/// downstream work (set bearer, navigate to Main, fetch games catalog).
-pub fn record_oauth_session(
-    model: &SharedModel,
-    access_token: String,
-    refresh_token: String,
-    expires_in: i64,
-) {
-    let session = AuthClient::session_from_oauth_tokens(access_token, refresh_token, expires_in);
-    let m = model.borrow();
-    let _ = m
-        .services
-        .inbox
-        .tx
-        .send(DbInboxEvent::SignInResult(Ok(session)));
-}
-
-/// Manually inject a Session — used by tests and by storage-backed
-/// "remember me" restores. Keeps the same downstream side effects as a
-/// fresh sign-in.
-#[allow(dead_code)]
-pub fn restore_session(model: &SharedModel, session: Session) {
-    let m = model.borrow();
-    let _ = m
-        .services
-        .inbox
-        .tx
-        .send(DbInboxEvent::SignInResult(Ok(session)));
-}
-
-/// Push the current session's score to Supabase if the player just
-/// finished a level or ran out of lives. Idempotent: tracks
-/// `last_phase` + `last_synced_session_score` so the network call fires
-/// exactly once per finalize transition, and only when the cumulative
-/// session score has grown since the last sync.
-///
-/// Call once per frame, after `drain_db_inbox`, so the function sees the
-/// freshest auth state (in case sign-in just landed). Cheap when not
-/// signed in or when no transition occurred.
-pub fn tick_score_sync(model: &SharedModel) {
-    let mut m = model.borrow_mut();
-
-    let phase = m.world.phase;
-    let prev_phase = m.score_sync.last_phase;
-    m.score_sync.last_phase = Some(phase);
-
-    // Only act on the transition INTO LevelComplete or GameOver.
-    let is_finalize = matches!(phase, Phase::LevelComplete | Phase::GameOver);
-    let just_entered = is_finalize && prev_phase != Some(phase);
-    if !just_entered {
-        return;
-    }
-    if m.auth.session.is_none() {
-        return;
-    }
-
-    let total_score = m.world.total_score;
-    let already_synced = m.score_sync.last_synced_session_score;
-    if total_score <= already_synced {
-        return;
-    }
-    let delta = (total_score - already_synced) as i32;
-
-    // Need a known game_id to call the RPC. If we don't have the games
-    // catalog cached yet, fetch it now; we'll retry on the next finalize
-    // (a future GameOver, etc.).
-    let Some(game_id) = m.cached_game_id() else {
-        if !m.menu_caches.games_pending && m.menu_caches.games.is_none() {
-            m.menu_caches.games_pending = true;
-            m.services.postgrest.list_games_async(&m.services.inbox);
-        }
-        return;
-    };
-
-    m.services.postgrest.add_game_score_async(&game_id, delta);
-    m.score_sync.last_synced_session_score = total_score;
-}
-
-/// Drain queued REST responses from the db inbox into the shared model.
-/// Call once per frame from the platform shell (or from a low-stack widget
-/// that is guaranteed to paint every frame). Idempotent and cheap when the
-/// inbox is empty.
-pub fn drain_db_inbox(model: &SharedModel) {
-    // Snapshot drained events under a short borrow so callbacks down below
-    // (which take borrow_mut) don't collide.
-    let mut events: Vec<DbInboxEvent> = Vec::new();
-    {
-        let m = model.borrow();
-        while let Ok(e) = m.services.inbox.rx.try_recv() {
-            events.push(e);
-        }
-    }
-    if events.is_empty() {
-        return;
-    }
-    let mut m = model.borrow_mut();
-    for e in events {
-        match e {
-            DbInboxEvent::SignInResult(Ok(s)) | DbInboxEvent::SignUpResult(Ok(s)) => {
-                m.services
-                    .postgrest
-                    .set_access_token(Some(s.access_token.clone()));
-                m.auth.record_session(s);
-                // Successful sign-in returns the user to the main menu so
-                // they see their email + Sign-out button.
-                m.menu_view = MenuView::Main;
-                // Future: persist via `Storage::save_session(&s)`.
-                // Pre-fetch the games catalog so `tick_score_sync` and the
-                // leaderboard / other-games overlays don't have to wait
-                // for an extra round-trip when the player first reaches a
-                // level-complete or opens those panels.
-                if m.menu_caches.games.is_none() && !m.menu_caches.games_pending {
-                    m.menu_caches.games_pending = true;
-                    m.services.postgrest.list_games_async(&m.services.inbox);
-                }
-            }
-            DbInboxEvent::SignInResult(Err(err)) | DbInboxEvent::SignUpResult(Err(err)) => {
-                m.auth.record_error(err);
-            }
-            DbInboxEvent::GamesList(Ok(games)) => {
-                m.menu_caches.games = Some(games);
-                m.menu_caches.games_pending = false;
-                m.menu_caches.games_error = None;
-            }
-            DbInboxEvent::GamesList(Err(err)) => {
-                m.menu_caches.games_pending = false;
-                m.menu_caches.games_error = Some(err);
-            }
-            DbInboxEvent::TopScoresList(Ok(rows)) => {
-                m.menu_caches.top_scores = Some(rows);
-                m.menu_caches.top_scores_pending = false;
-                m.menu_caches.top_scores_error = None;
-            }
-            DbInboxEvent::TopScoresList(Err(err)) => {
-                m.menu_caches.top_scores_pending = false;
-                m.menu_caches.top_scores_error = Some(err);
-            }
-            DbInboxEvent::PasswordResetRequested(Ok(email)) => {
-                m.auth.recover_pending = false;
-                m.auth.last_error = None;
-                m.auth.notice = Some(format!(
-                    "Reset link sent to {email}. Check your inbox, then come back."
-                ));
-            }
-            DbInboxEvent::PasswordResetRequested(Err(err)) => {
-                m.auth.recover_pending = false;
-                m.auth.notice = None;
-                m.auth.last_error = Some(format!("Reset failed: {err}"));
-            }
-            DbInboxEvent::PasswordUpdated(Ok(())) => {
-                // Promote the recovery tokens into a real Session and install
-                // them through the same code path email/password uses.
-                m.auth.pending = false;
-                let access = m.auth.recovery_access_token.take().unwrap_or_default();
-                let refresh = m.auth.recovery_refresh_token.take().unwrap_or_default();
-                let expires_in = m.auth.recovery_expires_in.take().unwrap_or(3600);
-                m.auth.last_error = None;
-                m.auth.notice = Some("Password updated. You're signed in.".to_owned());
-                let session = AuthClient::session_from_oauth_tokens(access, refresh, expires_in);
-                m.services
-                    .postgrest
-                    .set_access_token(Some(session.access_token.clone()));
-                m.auth.record_session(session);
-                // record_session clears the notice we just set; restore it.
-                m.auth.notice = Some("Password updated. You're signed in.".to_owned());
-                m.menu_view = MenuView::Main;
-                if m.menu_caches.games.is_none() && !m.menu_caches.games_pending {
-                    m.menu_caches.games_pending = true;
-                    m.services.postgrest.list_games_async(&m.services.inbox);
-                }
-            }
-            DbInboxEvent::PasswordUpdated(Err(err)) => {
-                m.auth.pending = false;
-                m.auth.notice = None;
-                m.auth.last_error = Some(format!("Couldn't set password: {err}"));
-            }
-        }
-    }
 }
 
 /// Returns true when this key produced a phase change.
@@ -558,5 +289,19 @@ mod tests {
         }
         assert_eq!(world.phase, Phase::Playing);
         assert!(world.last_life_lost_at.is_none());
+    }
+
+    /// Beating the previous best score must persist via the
+    /// `BestScoreStore` trait so the next session starts with the new high.
+    #[test]
+    fn best_score_persists_when_session_beats_record() {
+        let model = shared();
+        model.borrow_mut().world.total_score = 500;
+        model.borrow_mut().maybe_record_best_score();
+        assert_eq!(model.borrow().best_score, 500);
+        // Smaller subsequent score must not overwrite.
+        model.borrow_mut().world.total_score = 100;
+        model.borrow_mut().maybe_record_best_score();
+        assert_eq!(model.borrow().best_score, 500);
     }
 }
