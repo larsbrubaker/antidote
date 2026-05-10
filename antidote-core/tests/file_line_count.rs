@@ -18,6 +18,10 @@ const MAX_LINES: usize = 800;
 const EXCLUDED_DIRS: &[&str] = &[
     ".git",
     ".cursor",
+    // Claude Code spawns per-session worktrees under .claude/worktrees/<name>/;
+    // those mirror the whole repo including demo/node_modules and target/, so
+    // skipping the parent is simpler than enumerating every sub-exclusion.
+    ".claude",
     "target",
     "gfg",
     "demo/node_modules",

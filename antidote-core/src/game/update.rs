@@ -216,14 +216,24 @@ fn grow_bubble(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
         return;
     }
 
-    // Normal growth.
+    // Normal growth, capped at the playfield's shorter axis. The moment the
+    // bubble would span top-to-bottom (or left-to-right on a hypothetical
+    // narrower playfield) we freeze it — bigger than the playfield is
+    // unplayable and looks broken. Pin radius first, then position, so the
+    // wall checks below don't run with an oversized radius.
+    let max_radius = 0.5 * VIRTUAL_WIDTH.min(VIRTUAL_HEIGHT);
     g.radius += BUBBLE_GROW_RATE * dt;
+    if g.radius >= max_radius {
+        g.radius = max_radius;
+        g.growing = false;
+        g.frozen = true;
+    }
 
-    // Pin to walls (don't freeze). Use per-side checks rather than
-    // `f32::clamp(g.radius, W - g.radius)`: once the bubble outgrows the
-    // shorter playfield axis (radius > VIRTUAL_HEIGHT / 2) the clamp's
-    // `min > max` invariant fails and rust panics, which under WASM stops the
-    // rAF loop and looks like a hang. This mirrors antidote-core.js:222-233.
+    // Pin to walls (don't freeze on these). Use per-side checks rather than
+    // `f32::clamp(g.radius, W - g.radius)`: with a square playfield the clamp
+    // would hit its `min > max` failure mode the instant the bubble reaches
+    // the cap above, and rust panics. This shape mirrors
+    // antidote-core.js:222-233.
     if g.x - g.radius < 0.0 {
         g.x = g.radius;
     }
@@ -652,13 +662,14 @@ mod tests {
         assert_eq!(world.phase_elapsed, 0.0);
     }
 
-    /// Holding the pointer long enough for a bubble to outgrow the playfield's
-    /// shorter axis must not panic. The wall-pin code originally used
-    /// `f32::clamp(g.radius, H - g.radius)`, which panics when
-    /// `g.radius > H / 2` because `min > max`. Symptom in WASM was a frozen
-    /// canvas the moment a bubble grew tall enough to touch top and bottom.
+    /// The growing bubble must freeze the instant it spans the playfield's
+    /// shorter axis (2*radius == VIRTUAL_HEIGHT on the current 800×600 field).
+    /// Growing past that looks broken — the bubble is bigger than the box
+    /// containing it. Also a regression guard for the old `f32::clamp(min,
+    /// max)` panic when `min > max`: with the cap in place that branch is
+    /// never reached.
     #[test]
-    fn growing_bubble_can_exceed_playfield_height_without_panicking() {
+    fn growing_bubble_freezes_at_playfield_height() {
         let mut world = World::new();
         let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         level_init(&mut world, &mut physics);
@@ -675,16 +686,28 @@ mod tests {
                 physics.zero_body_velocity(handle);
             }
         }
-        // Spend the antidote budget growing one big bubble in the centre.
+        let cap = 0.5 * VIRTUAL_WIDTH.min(VIRTUAL_HEIGHT);
         on_pointer_down(&mut world, &mut physics, 400.0, 300.0);
-        // 20 seconds of growth at 80 px/s is far past the playfield height —
-        // enough to drive radius well over VIRTUAL_HEIGHT/2 = 300 and trip
-        // the old clamp panic.
+
+        // Grow well past the antidote budget — 20 simulated seconds is far
+        // more than the ~7.5 s needed to drain antidote, and far more than
+        // the ~3.75 s the bubble would need at 80 px/s to reach radius=300.
         for _ in 0..1200 {
             tick(&mut world, &mut physics, 1.0 / 60.0);
+            if let Some(g) = world.growing.as_ref() {
+                assert!(
+                    g.radius <= cap + 1e-3,
+                    "radius {} exceeded cap {}",
+                    g.radius,
+                    cap
+                );
+            }
         }
-        // Either the bubble is still growing past the playfield, or antidote
-        // ran out and froze it — either way the game must still be running.
+
+        let g = world.growing.as_ref().expect("bubble should still exist");
+        assert_eq!(g.radius, cap, "bubble must sit exactly at the cap");
+        assert!(!g.growing, "bubble must be frozen at the cap");
+        assert!(g.frozen, "bubble's `frozen` flag must be set at the cap");
         assert_ne!(world.phase, Phase::GameOver);
     }
 }
