@@ -1,25 +1,10 @@
 // Browser platform shell for Antidote.
 //
-// This file owns only DOM/canvas concerns: load wasm-pack output, fetch runtime
-// config, resize the canvas, forward browser input, and drive requestAnimationFrame.
-// Game rules, widget trees, menus, and layout live in antidote-core.
-
-type RuntimeConfig = {
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-};
-
-async function loadConfig(): Promise<RuntimeConfig> {
-  // Relative path so this works under any base URL (e.g. larsbrubaker.github.io/antidote/).
-  const resp = await fetch("runtime-config.json", { cache: "no-store" });
-  if (!resp.ok) throw new Error(`runtime-config.json missing: ${resp.status}`);
-  return await resp.json();
-}
+// This file owns only DOM/canvas concerns: load wasm-pack output, resize the
+// canvas, forward browser input, and drive requestAnimationFrame. Game rules,
+// widget trees, menus, and layout live in antidote-core.
 
 async function main() {
-  const config = await loadConfig();
-  console.log("antidote: loaded runtime config for", config.SUPABASE_URL);
-
   const canvas = document.getElementById("antidote-canvas") as HTMLCanvasElement | null;
   if (!canvas) throw new Error("missing #antidote-canvas");
 
@@ -30,30 +15,6 @@ async function main() {
   const wasmBgUrl = new URL("../pkg/antidote_wasm_bg.wasm", import.meta.url).href;
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
-
-  // OAuth + password-recovery callback handler. Supabase redirects back to
-  // this page with `#access_token=...&refresh_token=...&expires_in=...&type=...`
-  // appended to the URL. `type=recovery` means the user followed a
-  // password-reset email — route to the SetPassword overlay instead of
-  // signing them in directly. Anything else (oauth, magiclink, signup,
-  // invite) installs the session as a normal sign-in. Either way, we strip
-  // the hash so a refresh doesn't try to install the tokens twice.
-  if (window.location.hash.startsWith("#access_token=")) {
-    const params = new URLSearchParams(window.location.hash.slice(1));
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token") ?? "";
-    const expiresIn = parseInt(params.get("expires_in") ?? "3600", 10);
-    const tokenType = params.get("type") ?? "";
-    if (accessToken) {
-      const ttl = isNaN(expiresIn) ? 3600 : expiresIn;
-      if (tokenType === "recovery") {
-        wasm.enter_recovery_mode(accessToken, refreshToken, ttl);
-      } else {
-        wasm.oauth_complete(accessToken, refreshToken, ttl);
-      }
-      history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
-  }
 
   const resizeCanvas = () => {
     const dpr = Math.max(0.5, window.devicePixelRatio || 1);
@@ -104,11 +65,6 @@ async function main() {
     wasm.on_mouse_leave();
   });
 
-  // Keyboard forwarding — agg-gui's TextField widget needs key events to
-  // accept typing, and the global Esc/P pause handler reads them too.
-  // Listen on `window` (not the canvas) so focus on the page lets typing
-  // through even before the user has clicked into a TextField; the wasm
-  // side gates by widget focus internally.
   window.addEventListener("keydown", (event) => {
     const handled = wasm.on_key_down(
       event.key,

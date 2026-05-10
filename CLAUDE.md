@@ -4,7 +4,7 @@
 
 - 4-crate workspace: `antidote-core` (logic+widgets), `antidote-native` (winit + wgpu), `antidote-wasm` (cdylib), `demo/` (TS shell). Mirrors `agg-gui`'s demo-* pattern.
 - `antidote-core` MUST stay `wasm32`-clean. No `tokio`, no `dotenvy`, no `dirs`, no `winit`, no `wgpu`. Both shells inject services through traits in `antidote_core::platform`.
-- `antidote-native` and `antidote-wasm` are **platform shells only**. They wire up the OS/browser window or canvas, wgpu surface, event loop, input forwarding, and platform persistence. They contain **no game or UI content**: every game rule, widget tree, menu, layout, HUD, dialog, leaderboard, and interface the user sees is shared via `antidote-core`. Platform crates call shared builders such as `antidote_core::ui::build_antidote_app()` and forward events; they never construct screens or widgets directly.
+- `antidote-native` and `antidote-wasm` are **platform shells only**. They wire up the OS/browser window or canvas, wgpu surface, event loop, input forwarding, and platform persistence. They contain **no game or UI content**: every game rule, widget tree, menu, layout, HUD, and interface the user sees is shared via `antidote-core`. Platform crates call shared builders such as `antidote_core::ui::build_antidote_app_with_store()` and forward events; they never construct screens or widgets directly.
 - Platform split, copied from agg-gui's goal:
   - **Game / widget / layout code** → `antidote-core`
   - **GPU renderers (WGSL shaders, geometry, draw calls)** → `demo-wgpu` / future `agg-gui` wgpu backend
@@ -13,8 +13,7 @@
 - **Physics: rapier2d.** Don't replace it with a hand-rolled integrator. Body parameters (density, friction, restitution, damping, CCD) match `gfg/public/games/antidote/antidote-physics.js` exactly. PIXELS_PER_METER = 30. Box2D/Planck contact mixing matters for gameplay feel: use min friction and max restitution combine rules in Rapier so viruses can bounce off and push solid bubbles instead of losing energy and getting trapped too easily.
 - **Fixed timestep:** gameplay/physics updates must run through `antidote_core::game::timestep::FixedTimestep` at 60 Hz. Never feed wall-clock frame deltas directly into physics. Slow frames may run up to four fixed updates before drawing (15 fps floor); beyond that, drop accumulated time so collision steps stay bounded.
 - **Rendering: pixel-faithful reproduction of the JS Canvas.** Every gradient stop, alpha, line width, eye offset, spike orbit, wobble, ease curve, and pop-animation timing must match `gfg/public/games/antidote/antidote-rendering.js`. When in doubt, run the JS reference side-by-side and compare frames.
-- DB access goes through Supabase REST (PostgREST + `/auth/v1/*`) over `reqwest`. No direct Postgres connection — wouldn't work in WASM.
-- Anon key ships in the build artifact; RLS is what guards data. Never touch RLS without re-checking the policies in `db/migrations/0001_init.sql`.
+- **No accounts, no network.** The only persistence is a best-score number saved locally (JSON file on native, `localStorage` in the browser) via the `BestScoreStore` trait in `antidote_core::platform`. There is no Supabase, no auth, no leaderboard backend. If a feature requires a server round trip, it's out of scope.
 
 ## Local development uses agg-gui as a path dep — improve it as you go
 
@@ -40,10 +39,6 @@ The agg-gui rendering backend is split by widget purpose:
 Adding new hardware paths is expected. When a new game-sprite primitive (e.g. an animated radial-gradient ring) doesn't exist yet on the hardware path, **add it to agg-gui** (a new method on a hardware-aware `DrawCtx` impl, plus the matching WGSL shader), don't reach for the software fallback. Keep the public `DrawCtx` API uniform across the two backends so widget code doesn't have to know which backend it's running on.
 
 The native shell renders entirely on wgpu. The wasm shell does the same via WebGL/WebGPU. Software-path widgets emit their cached backbuffer as a textured quad on the GPU side.
-
-## Schema is multi-game
-
-Every user-facing table is keyed `(user_id, game_id)`. The `games` table is the single source of truth for `game_id`. New games add a row to `games`; nothing else in the schema needs to change.
 
 ## Reference
 
