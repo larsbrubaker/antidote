@@ -30,7 +30,6 @@ use crate::db::auth::AuthClient;
 use crate::db::inbox::{DbInboxEvent, Session};
 use crate::game::state::Phase;
 use auth_widget::SignInOverlay;
-use set_password_overlay::SetPasswordOverlay;
 #[cfg(test)]
 use game_model::shared;
 use game_model::{shared_with_config, MenuView, SharedModel, SupabaseConfig};
@@ -41,6 +40,7 @@ use life_lost_overlay::LifeLostOverlay;
 use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseOverlay};
 use other_games_widget::OtherGamesOverlay;
 use overlay_stack::OverlayStack;
+use set_password_overlay::SetPasswordOverlay;
 
 /// CascadiaCode is bundled into the binary so neither shell has to ship a
 /// separate font file. ~388 KB; small enough for both native and wasm.
