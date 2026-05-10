@@ -19,6 +19,7 @@ use agg_gui::color::Color;
 use agg_gui::geometry::Size;
 use agg_gui::layout_props::Insets;
 use agg_gui::text::Font;
+use agg_gui::widgets::button::{Button, ButtonTheme};
 use agg_gui::widgets::label::{Label, LabelAlign};
 use agg_gui::widgets::text_field::TextField;
 use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
@@ -93,8 +94,10 @@ impl SignInOverlay {
         });
 
         let google_btn = oauth_button(OAuthProvider::Google, font.clone(), model.clone());
-        let facebook_btn = oauth_button(OAuthProvider::Facebook, font.clone(), model.clone());
-        let apple_btn = oauth_button(OAuthProvider::Apple, font.clone(), model.clone());
+        // Facebook and Apple are intentionally hidden until those providers
+        // are actually configured in Supabase (see `db/README.md`). The
+        // OAuthProvider enum still has the variants so re-enabling them is
+        // a one-line change once their Client IDs land.
 
         let children: Vec<Box<dyn Widget>> = vec![
             header_label("Sign in", font.clone(), 30.0),
@@ -109,8 +112,6 @@ impl SignInOverlay {
             signin_btn,
             signup_btn,
             google_btn,
-            facebook_btn,
-            apple_btn,
             back_btn,
         ];
 
@@ -139,9 +140,14 @@ impl SignInOverlay {
 /// Each provider must be configured (Client ID + Secret) in the Supabase
 /// Dashboard before the round trip will succeed; until then the user lands
 /// on a Supabase error page. See `db/README.md`.
+///
+/// Google's button uses the white-on-dark-text styling from Google's brand
+/// guidelines (one of two officially approved styles). Other providers fall
+/// back to the standard secondary-button look until we ship dedicated
+/// branding for each.
 fn oauth_button(provider: OAuthProvider, font: Arc<Font>, model: SharedModel) -> Box<dyn Widget> {
     let label = format!("Sign in with {}", provider.display_name());
-    secondary_button(&label, font, move || {
+    let click = move || {
         let mut m = model.borrow_mut();
         // The platform shell looks up its own redirect target; here we just
         // mark which provider was requested. The shell builds the URL via
@@ -150,7 +156,33 @@ fn oauth_button(provider: OAuthProvider, font: Arc<Font>, model: SharedModel) ->
         // free of any platform/redirect-URL knowledge.
         m.auth.pending_oauth = Some(provider);
         m.auth.last_error = None;
-    })
+    };
+    match provider {
+        OAuthProvider::Google => Box::new(
+            Button::new(&label, font)
+                .with_font_size(16.0)
+                .with_theme(google_button_theme())
+                .with_min_size(Size::new(COL_W, 40.0))
+                .on_click(click),
+        ),
+        _ => secondary_button(&label, font, click),
+    }
+}
+
+/// Google's brand-approved white button: white surface + Google's neutral
+/// dark-grey text (`#3C4043`). Hover/pressed states from their guidelines
+/// are subtle grey shifts. Border radius matches the rest of our menu
+/// buttons.
+fn google_button_theme() -> ButtonTheme {
+    ButtonTheme {
+        background: Color::rgb(1.0, 1.0, 1.0),
+        background_hovered: Color::rgb(0.95, 0.96, 0.97),
+        background_pressed: Color::rgb(0.88, 0.89, 0.91),
+        label_color: Color::rgb(0.235, 0.251, 0.263),
+        border_radius: 6.0,
+        focus_ring_color: Color::rgba(0.259, 0.522, 0.957, 0.55),
+        focus_ring_width: 2.5,
+    }
 }
 
 fn submit(

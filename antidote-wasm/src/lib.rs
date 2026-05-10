@@ -55,6 +55,11 @@ struct WgpuInit {
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();
+    // Build the App + SharedModel synchronously so `oauth_complete` (which
+    // the TS shell may call before the first `render()`) sees a populated
+    // MODEL. This doesn't need wgpu — `build_antidote_app` only
+    // constructs widgets and the GameModel.
+    ensure_app();
     wasm_bindgen_futures::spawn_local(async {
         match init_wgpu_async().await {
             Ok(init) => WGPU_INIT.with(|c| *c.borrow_mut() = Some(init)),
@@ -192,8 +197,17 @@ fn drain_pending_oauth_with_origin() {
 /// session is registered the same way email/password sign-ins land — via
 /// the db inbox — so the rest of the UI sees a fresh `auth.session`
 /// without any other special-casing.
+///
+/// Important: must call `ensure_app()` *before* reading `MODEL`. The TS
+/// shell invokes this immediately after `await wasm.default()`, before
+/// the rAF loop has a chance to fire its first `render()` (which is
+/// what normally populates `MODEL`). Without this call here the
+/// function silently no-ops and the OAuth tokens are dropped — the
+/// symptom Lars saw was a black screen with `#access_token=...` in the
+/// URL but no signed-in session.
 #[wasm_bindgen]
 pub fn oauth_complete(access_token: String, refresh_token: String, expires_in: i64) {
+    ensure_app();
     let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
     let Some(model) = model else { return };
     antidote_core::ui::record_oauth_session(&model, access_token, refresh_token, expires_in);
