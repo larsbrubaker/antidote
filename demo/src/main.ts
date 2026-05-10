@@ -31,18 +31,26 @@ async function main() {
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
 
-  // OAuth callback handler: Supabase redirects back to this page with
-  // `#access_token=...&refresh_token=...&expires_in=...&token_type=bearer`
-  // appended to the URL. Hand those tokens to wasm so the rest of the UI
-  // sees a fresh signed-in session, then clean the URL so a refresh
-  // doesn't try to install the same tokens twice.
+  // OAuth + password-recovery callback handler. Supabase redirects back to
+  // this page with `#access_token=...&refresh_token=...&expires_in=...&type=...`
+  // appended to the URL. `type=recovery` means the user followed a
+  // password-reset email — route to the SetPassword overlay instead of
+  // signing them in directly. Anything else (oauth, magiclink, signup,
+  // invite) installs the session as a normal sign-in. Either way, we strip
+  // the hash so a refresh doesn't try to install the tokens twice.
   if (window.location.hash.startsWith("#access_token=")) {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const accessToken = params.get("access_token");
     const refreshToken = params.get("refresh_token") ?? "";
     const expiresIn = parseInt(params.get("expires_in") ?? "3600", 10);
+    const tokenType = params.get("type") ?? "";
     if (accessToken) {
-      wasm.oauth_complete(accessToken, refreshToken, isNaN(expiresIn) ? 3600 : expiresIn);
+      const ttl = isNaN(expiresIn) ? 3600 : expiresIn;
+      if (tokenType === "recovery") {
+        wasm.enter_recovery_mode(accessToken, refreshToken, ttl);
+      } else {
+        wasm.oauth_complete(accessToken, refreshToken, ttl);
+      }
       history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }

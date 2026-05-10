@@ -24,11 +24,13 @@ pub mod life_lost_overlay;
 pub mod menu_widget;
 pub mod other_games_widget;
 pub mod overlay_stack;
+pub mod set_password_overlay;
 
 use crate::db::auth::AuthClient;
 use crate::db::inbox::{DbInboxEvent, Session};
 use crate::game::state::Phase;
 use auth_widget::SignInOverlay;
+use set_password_overlay::SetPasswordOverlay;
 #[cfg(test)]
 use game_model::shared;
 use game_model::{shared_with_config, MenuView, SharedModel, SupabaseConfig};
@@ -67,6 +69,7 @@ pub fn build_antidote_app_with_config(config: SupabaseConfig) -> (App, SharedMod
     let hud = HudWidget::new(model.clone(), font.clone());
     let main_menu = MainMenuOverlay::new(model.clone(), font.clone());
     let sign_in = SignInOverlay::new(model.clone(), font.clone());
+    let set_password = SetPasswordOverlay::new(model.clone(), font.clone());
     let leaderboard = LeaderboardOverlay::new(model.clone(), font.clone());
     let other_games = OtherGamesOverlay::new(model.clone(), font.clone());
     let life_lost = LifeLostOverlay::new(model.clone(), font.clone());
@@ -86,6 +89,7 @@ pub fn build_antidote_app_with_config(config: SupabaseConfig) -> (App, SharedMod
         .add(Box::new(life_lost))
         .add(Box::new(main_menu))
         .add(Box::new(sign_in))
+        .add(Box::new(set_password))
         .add(Box::new(leaderboard))
         .add(Box::new(other_games))
         .add(Box::new(level_complete))
@@ -141,6 +145,28 @@ pub fn drain_pending_password_reset(model: &SharedModel, redirect_to: &str) {
     m.services
         .auth
         .request_password_reset_async(&email, redirect_to, &m.services.inbox);
+}
+
+/// Stash a recovery-flow access token (from a `type=recovery` callback
+/// URL) without yet treating the user as fully signed in. The
+/// `SetPasswordOverlay` reads this token, posts a new password to
+/// `PUT /auth/v1/user`, and only THEN (in the `PasswordUpdated(Ok(_))`
+/// drain branch) is the session installed for real. Until that point the
+/// user can't navigate elsewhere — the recovery session is a single-use
+/// token meant for resetting the password and nothing else.
+pub fn record_recovery_token(
+    model: &SharedModel,
+    access_token: String,
+    refresh_token: String,
+    expires_in: i64,
+) {
+    let mut m = model.borrow_mut();
+    m.auth.recovery_access_token = Some(access_token);
+    m.auth.recovery_refresh_token = Some(refresh_token);
+    m.auth.recovery_expires_in = Some(expires_in);
+    m.auth.last_error = None;
+    m.auth.notice = None;
+    m.menu_view = MenuView::SetPassword;
 }
 
 /// Record a session that arrived via an OAuth redirect (web) or local
@@ -295,6 +321,33 @@ pub fn drain_db_inbox(model: &SharedModel) {
                 m.auth.recover_pending = false;
                 m.auth.notice = None;
                 m.auth.last_error = Some(format!("Reset failed: {err}"));
+            }
+            DbInboxEvent::PasswordUpdated(Ok(())) => {
+                // Promote the recovery tokens into a real Session and install
+                // them through the same code path email/password uses.
+                m.auth.pending = false;
+                let access = m.auth.recovery_access_token.take().unwrap_or_default();
+                let refresh = m.auth.recovery_refresh_token.take().unwrap_or_default();
+                let expires_in = m.auth.recovery_expires_in.take().unwrap_or(3600);
+                m.auth.last_error = None;
+                m.auth.notice = Some("Password updated. You're signed in.".to_owned());
+                let session = AuthClient::session_from_oauth_tokens(access, refresh, expires_in);
+                m.services
+                    .postgrest
+                    .set_access_token(Some(session.access_token.clone()));
+                m.auth.record_session(session);
+                // record_session clears the notice we just set; restore it.
+                m.auth.notice = Some("Password updated. You're signed in.".to_owned());
+                m.menu_view = MenuView::Main;
+                if m.menu_caches.games.is_none() && !m.menu_caches.games_pending {
+                    m.menu_caches.games_pending = true;
+                    m.services.postgrest.list_games_async(&m.services.inbox);
+                }
+            }
+            DbInboxEvent::PasswordUpdated(Err(err)) => {
+                m.auth.pending = false;
+                m.auth.notice = None;
+                m.auth.last_error = Some(format!("Couldn't set password: {err}"));
             }
         }
     }

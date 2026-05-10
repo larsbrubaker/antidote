@@ -139,9 +139,8 @@ impl AuthClient {
         );
 
         let tx = inbox.tx.clone();
-        let email = String::new();
         ehttp::fetch(req, move |result| {
-            let event = DbInboxEvent::PasswordResetRequested(parse_recover_response(result, email));
+            let event = DbInboxEvent::PasswordUpdated(parse_password_update_response(result));
             let _ = tx.send(event);
         });
     }
@@ -338,7 +337,22 @@ fn parse_token_response(
     })
 }
 
-/// Parse `/auth/v1/recover` (or `PUT /auth/v1/user`) response. Body is
+/// Parse the `PUT /auth/v1/user` response. 200 on success (body is the
+/// updated user object, which we don't need to read).
+fn parse_password_update_response(result: Result<ehttp::Response, String>) -> Result<(), String> {
+    let resp = result.map_err(|e| format!("network: {e}"))?;
+    if !resp.ok {
+        let body = std::str::from_utf8(&resp.bytes).unwrap_or("");
+        let raw = serde_json::from_str::<ErrorResponse>(body)
+            .ok()
+            .and_then(|e| e.msg.or(e.error_description).or(e.message))
+            .unwrap_or_else(|| body.to_owned());
+        return Err(format!("{}: {}", resp.status, raw));
+    }
+    Ok(())
+}
+
+/// Parse `/auth/v1/recover` response. Body is
 /// empty on success; `email` is echoed back on Ok so the UI can include it
 /// in the confirmation toast.
 fn parse_recover_response(

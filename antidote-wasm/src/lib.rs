@@ -229,6 +229,20 @@ pub fn oauth_complete(access_token: String, refresh_token: String, expires_in: i
     mark_dirty();
 }
 
+/// Enter password-reset mode after a recovery email link redirected the
+/// user back to the page. The TS shell calls this (not `oauth_complete`)
+/// when it spots `type=recovery` in the URL hash. The recovery token is
+/// stashed; the SetPasswordOverlay uses it to authorize a single
+/// `PUT /auth/v1/user` call, after which we install the session for real.
+#[wasm_bindgen]
+pub fn enter_recovery_mode(access_token: String, refresh_token: String, expires_in: i64) {
+    ensure_app();
+    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
+    let Some(model) = model else { return };
+    antidote_core::ui::record_recovery_token(&model, access_token, refresh_token, expires_in);
+    mark_dirty();
+}
+
 fn ensure_wgpu_ctx(width: f32, height: f32) {
     WGPU_CTX.with(|ctx_cell| {
         if ctx_cell.borrow().is_some() {

@@ -68,6 +68,10 @@ pub enum MenuView {
     SignIn,
     Leaderboard,
     OtherGames,
+    /// Reached only via a `type=recovery` callback URL. Shows the
+    /// [`crate::ui::set_password_overlay::SetPasswordOverlay`] which writes
+    /// a new password into the recovery-bearer-authenticated user record.
+    SetPassword,
 }
 
 /// State of the current sign-in flow. The sign-in widget reads this to
@@ -101,6 +105,16 @@ pub struct AuthState {
     /// Rendered in green below the password field. Cleared on the next
     /// form interaction.
     pub notice: Option<String>,
+    /// Recovery access token — present only between hitting a
+    /// `type=recovery` callback URL and successfully posting a new
+    /// password. Bearer-authenticates `PUT /auth/v1/user`. Cleared on
+    /// success or when the user backs out.
+    pub recovery_access_token: Option<String>,
+    /// Pending refresh token / expires_in alongside `recovery_access_token`
+    /// — once the password update succeeds we install the full Session
+    /// like a normal sign-in, so we hold the rest of the trio here.
+    pub recovery_refresh_token: Option<String>,
+    pub recovery_expires_in: Option<i64>,
 }
 
 impl AuthState {

@@ -42,6 +42,10 @@ pub enum DbInboxEvent {
     /// accepted. The Ok variant carries the email we asked about so the UI
     /// can echo it in the confirmation message.
     PasswordResetRequested(Result<String, String>),
+    /// Result of [`crate::db::auth::AuthClient::update_password_async`].
+    /// On success the UI should install the recovery session as a normal
+    /// sign-in and route back to the main menu.
+    PasswordUpdated(Result<(), String>),
 }
 
 /// Persisted Supabase session — lives in [`SharedModel`] for as long as the
