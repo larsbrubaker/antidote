@@ -93,17 +93,21 @@ impl SignInOverlay {
             m.menu_view = MenuView::Main;
         });
 
-        let google_btn = oauth_button(OAuthProvider::Google, font.clone(), model.clone());
-        // Facebook and Apple are intentionally hidden until those providers
-        // are actually configured in Supabase (see `db/README.md`). The
-        // OAuthProvider enum still has the variants so re-enabling them is
-        // a one-line change once their Client IDs land.
-
-        let children: Vec<Box<dyn Widget>> = vec![
+        // OAuth round trips need a same-origin redirect target to capture
+        // the hash fragment with the access tokens. The browser shell can
+        // do this trivially (its origin is the deployed page); the native
+        // shell would need a localhost-loopback HTTP listener, which we
+        // haven't built yet. Until then, skip the OAuth buttons on
+        // native — the user lands on a Supabase callback page they
+        // can't return from. Email/password works on both targets.
+        //
+        // Facebook and Apple variants stay hidden in either build until
+        // their providers are configured in Supabase (see db/README.md).
+        let mut children: Vec<Box<dyn Widget>> = vec![
             header_label("Sign in", font.clone(), 30.0),
             body_label(
                 "Sign in to keep your scores across devices.",
-                font,
+                font.clone(),
                 Some(Color::rgba(0.75, 0.82, 0.95, 1.0)),
             ),
             Box::new(email_field),
@@ -111,9 +115,15 @@ impl SignInOverlay {
             Box::new(error_label),
             signin_btn,
             signup_btn,
-            google_btn,
-            back_btn,
         ];
+        #[cfg(target_arch = "wasm32")]
+        children.push(oauth_button(
+            OAuthProvider::Google,
+            font.clone(),
+            model.clone(),
+        ));
+        children.push(back_btn);
+        let _ = &font; // silence "unused after move" on cfg(not(wasm32))
 
         Self {
             bounds: Rect::default(),

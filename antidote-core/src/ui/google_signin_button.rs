@@ -1,11 +1,17 @@
-//! "Sign in with Google" button — Google's brand-approved white-button
-//! variant, with the multicolor "G" SVG mark at the leading edge and
-//! "Sign in with Google" centered in `Roboto`-style grey text alongside it.
+//! "Sign in with Google" button — same dark color theme + size as the
+//! other menu secondary buttons, with Google's multicolor "G" SVG mark
+//! painted on top of the leading edge and "Sign in with Google" text
+//! centered alongside it.
 //!
 //! Implemented as a custom widget rather than a themed [`Button`] because
 //! Button's child slot is reserved for a single Label — it can't host the
 //! SVG icon next to the label text. The widget mirrors Button's hover /
 //! pressed state machine so it feels identical to interact with.
+//!
+//! Visually: identical background / hover / pressed colors to
+//! [`crate::ui::menu_widget::secondary_button`] — the only difference is
+//! the colored "G" leading the label. Google's brand guidelines allow
+//! this dark-button variant alongside the all-white version.
 //!
 //! The SVG embedded below is Google's official 4-path "G" logo (viewBox
 //! `0 0 48 48`) — same asset Google's own JS sign-in button uses. The
@@ -31,13 +37,16 @@ const GOOGLE_G_SVG: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox
 <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/>
 </svg>"##;
 
-/// Google's brand-approved button label color (a neutral grey, `#3C4043`).
-const LABEL_COLOR: Color = Color::rgb(0.235, 0.251, 0.263);
+/// White label, matching the other dark secondary buttons.
+const LABEL_COLOR: Color = Color::rgb(1.0, 1.0, 1.0);
 
 const ICON_SIZE: f64 = 18.0;
-const ICON_TEXT_GAP: f64 = 12.0;
-const FONT_SIZE: f64 = 14.0;
+const ICON_TEXT_GAP: f64 = 10.0;
+/// Match `menu_widget::secondary_button`'s `with_font_size(16.0)`.
+const FONT_SIZE: f64 = 16.0;
 const BORDER_RADIUS: f64 = 6.0;
+/// Match `menu_widget::secondary_button`'s `with_min_size(.., 38.0)`.
+const BUTTON_HEIGHT: f64 = 38.0;
 
 pub struct GoogleSignInButton {
     bounds: Rect,
@@ -60,16 +69,17 @@ impl GoogleSignInButton {
         }
     }
 
-    /// Background color for the current hover/pressed state. Matches
-    /// Google's brand-approved "white button" hover/pressed treatment —
-    /// subtle grey shifts, not a color change.
+    /// Background color for the current hover/pressed state. Matches the
+    /// `secondary_button` theme in `menu_widget.rs` byte-for-byte so this
+    /// button reads as a peer of "Create account" / "Back" rather than a
+    /// stylistic outlier.
     fn background_color(&self) -> Color {
         if self.pressed {
-            Color::rgb(0.88, 0.89, 0.91)
+            Color::rgba(0.14, 0.17, 0.24, 1.0)
         } else if self.hovered {
-            Color::rgb(0.95, 0.96, 0.97)
+            Color::rgba(0.24, 0.28, 0.38, 1.0)
         } else {
-            Color::rgb(1.0, 1.0, 1.0)
+            Color::rgba(0.18, 0.22, 0.30, 1.0)
         }
     }
 
@@ -99,7 +109,7 @@ impl Widget for GoogleSignInButton {
 
     fn layout(&mut self, available: Size) -> Size {
         // Same height as the rest of the menu's secondary buttons.
-        Size::new(available.width, 40.0)
+        Size::new(available.width, BUTTON_HEIGHT)
     }
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
@@ -109,18 +119,11 @@ impl Widget for GoogleSignInButton {
             return;
         }
 
-        // Background — rounded white pill with hover/pressed shifts.
+        // Background — rounded pill matching the secondary buttons' theme.
         ctx.set_fill_color(self.background_color());
         ctx.begin_path();
         ctx.rounded_rect(0.0, 0.0, w, h, BORDER_RADIUS);
         ctx.fill();
-
-        // Subtle outer hairline so the white reads against any background.
-        ctx.set_stroke_color(Color::rgba(0.0, 0.0, 0.0, 0.12));
-        ctx.set_line_width(1.0);
-        ctx.begin_path();
-        ctx.rounded_rect(0.5, 0.5, w - 1.0, h - 1.0, BORDER_RADIUS);
-        ctx.stroke();
 
         // Layout: icon + gap + text, the whole group horizontally centered.
         ctx.set_font(self.font.clone());

@@ -96,6 +96,33 @@ async function main() {
     wasm.on_mouse_leave();
   });
 
+  // Keyboard forwarding — agg-gui's TextField widget needs key events to
+  // accept typing, and the global Esc/P pause handler reads them too.
+  // Listen on `window` (not the canvas) so focus on the page lets typing
+  // through even before the user has clicked into a TextField; the wasm
+  // side gates by widget focus internally.
+  window.addEventListener("keydown", (event) => {
+    const handled = wasm.on_key_down(
+      event.key,
+      event.shiftKey,
+      event.ctrlKey,
+      event.altKey,
+      event.metaKey,
+    );
+    if (handled) {
+      event.preventDefault();
+    }
+  });
+  window.addEventListener("keyup", (event) => {
+    wasm.on_key_up(
+      event.key,
+      event.shiftKey,
+      event.ctrlKey,
+      event.altKey,
+      event.metaKey,
+    );
+  });
+
   window.addEventListener("resize", resizeCanvas);
   resizeCanvas();
 

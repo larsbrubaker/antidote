@@ -29,7 +29,7 @@ mod platform;
 use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
-use agg_gui::{App, Modifiers, MouseButton};
+use agg_gui::{App, Key, Modifiers, MouseButton};
 use antidote_core::ui::{build_antidote_app, game_model::SharedModel};
 use demo_wgpu::{begin_frame, WgpuGfxCtx};
 use wasm_bindgen::prelude::*;
@@ -345,6 +345,83 @@ pub fn on_mouse_up(x: f64, y: f64, button: u8) {
         }
     });
     mark_dirty();
+}
+
+/// Browser keyboard input → agg-gui. Returns `true` if any focused
+/// widget consumed the event so the TS shell can call `preventDefault()`
+/// (otherwise Tab navigation, arrow-key scrolling, etc. would fight the
+/// in-game text fields).
+///
+/// `key` is the raw `KeyboardEvent.key` string (`"a"`, `"Backspace"`,
+/// `"ArrowLeft"`, …). Modifiers come through as four booleans, matching
+/// the `KeyboardEvent` properties.
+#[wasm_bindgen]
+pub fn on_key_down(key: String, shift: bool, ctrl: bool, alt: bool, meta: bool) -> bool {
+    ensure_app();
+    let Some(parsed) = parse_browser_key(&key) else {
+        return false;
+    };
+    let mods = Modifiers {
+        shift,
+        ctrl,
+        alt,
+        meta,
+    };
+    APP.with(|cell| {
+        if let Some(app) = cell.borrow_mut().as_mut() {
+            app.on_key_down(parsed, mods);
+        }
+    });
+    mark_dirty();
+    // Always claim the event when we forwarded it — agg-gui's App may not
+    // surface a per-event "consumed" bit yet, but every key we recognize
+    // is one we want the browser to leave alone (text-field typing, Esc/P
+    // pause, etc.).
+    true
+}
+
+#[wasm_bindgen]
+pub fn on_key_up(key: String, shift: bool, ctrl: bool, alt: bool, meta: bool) {
+    let Some(parsed) = parse_browser_key(&key) else {
+        return;
+    };
+    let mods = Modifiers {
+        shift,
+        ctrl,
+        alt,
+        meta,
+    };
+    APP.with(|cell| {
+        if let Some(app) = cell.borrow_mut().as_mut() {
+            app.on_key_up(parsed, mods);
+        }
+    });
+    mark_dirty();
+}
+
+/// Map a browser `KeyboardEvent.key` string to agg-gui's [`Key`] enum.
+/// Returns `None` for keys we deliberately don't forward (Shift/Control
+/// alone, F-keys, etc.) so the browser keeps its default behaviour.
+fn parse_browser_key(key: &str) -> Option<Key> {
+    match key {
+        "Backspace" => Some(Key::Backspace),
+        "Delete" => Some(Key::Delete),
+        "Insert" => Some(Key::Insert),
+        "ArrowLeft" => Some(Key::ArrowLeft),
+        "ArrowRight" => Some(Key::ArrowRight),
+        "ArrowUp" => Some(Key::ArrowUp),
+        "ArrowDown" => Some(Key::ArrowDown),
+        "Home" => Some(Key::Home),
+        "End" => Some(Key::End),
+        "Tab" => Some(Key::Tab),
+        "Enter" => Some(Key::Enter),
+        "Escape" => Some(Key::Escape),
+        // Single visible character → Char(c). Anything multi-char and not
+        // in the allow-list above is something we don't model (modifier-
+        // only keys, F-keys, "PageUp", etc.) — let the browser handle it.
+        s if s.chars().count() == 1 => s.chars().next().map(Key::Char),
+        _ => None,
+    }
 }
 
 #[wasm_bindgen]
