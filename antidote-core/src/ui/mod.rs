@@ -17,6 +17,7 @@ use agg_gui::{App, Key};
 pub mod auth_widget;
 pub mod game_model;
 pub mod game_widget;
+pub mod google_signin_button;
 pub mod hud_widget;
 pub mod leaderboard_widget;
 pub mod life_lost_overlay;
