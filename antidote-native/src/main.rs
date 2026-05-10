@@ -148,10 +148,12 @@ fn main() {
     let mut cursor_y = 0.0_f64;
     let mut current_mods = Modifiers::default();
 
-    // Light-touch frame-time logger — averages over 30 frames, prints once per
-    // ~half second so we can spot regressions without spamming stdout.
+    // Light-touch frame-time logger. Sums *paint work* only — start a stopwatch
+    // around `paint_frame` itself, NOT around wall-clock between log dumps,
+    // so vsync sleeps don't get reported as render cost. Prints once every
+    // 60 painted frames.
     let mut frame_count: u32 = 0;
-    let mut frame_window_start = Instant::now();
+    let mut paint_time_sum_ms: f64 = 0.0;
 
     event_loop
         .run(move |event, elwt| match event {
@@ -275,17 +277,15 @@ fn main() {
                         eprintln!("antidote: failed to open browser for OAuth: {err}");
                     }
                 }
-                paint_frame(&gpu, &mut wgpu_ctx, &mut app, win_w, win_h);
+                if let Some(ms) = paint_frame(&gpu, &mut wgpu_ctx, &mut app, win_w, win_h) {
+                    paint_time_sum_ms += ms;
+                }
                 frame_count += 1;
                 if frame_count >= 60 {
-                    let avg_ms =
-                        frame_window_start.elapsed().as_secs_f64() * 1000.0 / frame_count as f64;
-                    eprintln!(
-                        "antidote: {avg_ms:.1} ms/frame ({:.0} fps)",
-                        1000.0 / avg_ms
-                    );
+                    let avg_ms = paint_time_sum_ms / frame_count as f64;
+                    eprintln!("antidote: {avg_ms:.2} ms/frame paint cost");
                     frame_count = 0;
-                    frame_window_start = Instant::now();
+                    paint_time_sum_ms = 0.0;
                 }
             }
 
@@ -299,16 +299,25 @@ fn main() {
         .expect("event loop");
 }
 
-fn paint_frame(gpu: &Gpu, ctx: &mut WgpuGfxCtx, app: &mut App, win_w: u32, win_h: u32) {
+/// Render one frame and return the wall-time spent on actual paint work
+/// (layout + paint + GPU encode/submit). Surface acquire and present are
+/// excluded because they're dominated by vsync waits, which would
+/// otherwise mask the real cost we want to track.
+fn paint_frame(
+    gpu: &Gpu,
+    ctx: &mut WgpuGfxCtx,
+    app: &mut App,
+    win_w: u32,
+    win_h: u32,
+) -> Option<f64> {
     if win_w == 0 || win_h == 0 {
-        return;
+        return None;
     }
-    let Some(frame) = acquire_frame(gpu) else {
-        return;
-    };
+    let frame = acquire_frame(gpu)?;
     let view = frame
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
+    let work_start = Instant::now();
     ctx.set_surface_texture(frame.texture.clone());
     ctx.reset(win_w as f32, win_h as f32);
     ctx.set_lcd_mode(agg_gui::font_settings::lcd_enabled());
@@ -316,7 +325,9 @@ fn paint_frame(gpu: &Gpu, ctx: &mut WgpuGfxCtx, app: &mut App, win_w: u32, win_h
     app.layout(Size::new(win_w as f64, win_h as f64));
     app.paint(ctx);
     ctx.end_frame();
+    let work_ms = work_start.elapsed().as_secs_f64() * 1000.0;
     frame.present();
+    Some(work_ms)
 }
 
 fn acquire_frame(gpu: &Gpu) -> Option<wgpu::SurfaceTexture> {
