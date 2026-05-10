@@ -1,8 +1,12 @@
 # Antidote
 
-Bubble-trap virus puzzle game in Rust — rendered with [agg-gui](https://github.com/larsbrubaker/agg-gui), persisted to Supabase, runs natively (winit + wgpu) and in the browser (WebAssembly).
+[![Antidote](readme_hero.png)](https://larsbrubaker.github.io/antidote/)
 
-Held pointer grows an antidote bubble; bouncing viruses get trapped if they can't move for 3 seconds; lives, levels, and a multi-game leaderboard.
+[Live Demo](https://larsbrubaker.github.io/antidote/) · [Repository](https://github.com/larsbrubaker/antidote)
+
+Bubble-trap virus puzzle game in Rust — rendered with [agg-gui](https://github.com/larsbrubaker/agg-gui), physics by [rapier2d](https://rapier.rs/), persisted to Supabase. Runs natively (winit + wgpu) and in the browser (WebAssembly).
+
+Held pointer grows an antidote bubble; bouncing viruses get trapped if they can't move for 3 seconds; lives, levels, and a cross-device leaderboard. Sign in with Google to keep scores across web, desktop, and (future) mobile.
 
 > Ported from the original TypeScript / Canvas 2D / Planck.js implementation, preserved under `gfg/` for read-only reference.
 
@@ -43,12 +47,14 @@ Auth: Supabase email/password via REST. Tokens cached in a JSON file on native, 
 
 | Milestone | Description | State |
 |-----------|-------------|-------|
-| M1 | Skeleton + Supabase round-trip | scaffolding committed |
-| M2 | Native gameplay MVP | pending |
-| M3 | Auth + score sync | pending |
-| M4 | Menus, multiple levels, lives | pending |
-| M5 | WASM build + GitHub Pages deploy | pending |
-| M6 | Polish + hero image | pending |
+| M1 | Skeleton + Supabase round-trip | ✓ |
+| M2 | Native gameplay MVP | ✓ |
+| M3 | Auth + score sync (email/password + Google) | ✓ |
+| M4 | Menus, multiple levels, lives | ✓ |
+| M5 | WASM build + GitHub Pages deploy | ✓ |
+| M6 | Polish (Facebook/Apple OAuth, persisted sessions, achievements engine, mobile shells) | in progress |
+
+See [`antidote_todo.md`](antidote_todo.md) for the live punch list.
 
 ## License
 
