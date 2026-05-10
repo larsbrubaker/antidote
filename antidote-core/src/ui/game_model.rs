@@ -89,6 +89,18 @@ pub struct AuthState {
     /// target, and either redirects (web) or opens the system browser
     /// (native).
     pub pending_oauth: Option<OAuthProvider>,
+    /// Set by the "Forgot password?" button. Carries the email the player
+    /// typed; the shell's per-frame
+    /// [`crate::ui::drain_pending_password_reset`] hook converts it to a
+    /// `/auth/v1/recover` REST call once it knows the right `redirect_to`.
+    pub pending_recover_email: Option<String>,
+    /// True between firing a recovery request and receiving its result —
+    /// drives the "Forgot password" button's disabled state.
+    pub recover_pending: bool,
+    /// Non-error informational message — e.g. "Reset link sent to …".
+    /// Rendered in green below the password field. Cleared on the next
+    /// form interaction.
+    pub notice: Option<String>,
 }
 
 impl AuthState {
@@ -99,12 +111,14 @@ impl AuthState {
         self.session = Some(session);
         self.pending = false;
         self.last_error = None;
+        self.notice = None;
     }
 
     /// Mark a failed REST call. Clears `pending` so the form re-enables.
     pub fn record_error(&mut self, message: String) {
         self.pending = false;
         self.last_error = Some(message);
+        self.notice = None;
     }
 }
 

@@ -123,6 +123,26 @@ pub fn drain_pending_oauth(model: &SharedModel, redirect_to: &str) {
     m.pending_open_url = Some(url);
 }
 
+/// Drain the "Forgot password?" click signal — calls
+/// `/auth/v1/recover` with the email the user typed and the
+/// shell-supplied `redirect_to` (the URL Supabase sends the user to in
+/// the recovery email). Same shape as [`drain_pending_oauth`]: the email
+/// is consumed, so the click only fires once.
+pub fn drain_pending_password_reset(model: &SharedModel, redirect_to: &str) {
+    let mut m = model.borrow_mut();
+    let Some(email) = m.auth.pending_recover_email.take() else {
+        return;
+    };
+    if m.services.config.url.is_empty() {
+        m.auth.recover_pending = false;
+        m.auth.last_error = Some("Supabase URL not configured".to_owned());
+        return;
+    }
+    m.services
+        .auth
+        .request_password_reset_async(&email, redirect_to, &m.services.inbox);
+}
+
 /// Record a session that arrived via an OAuth redirect (web) or local
 /// callback handler (native). Called by the platform shell after parsing
 /// `#access_token=...&refresh_token=...&expires_in=...` out of the
@@ -263,6 +283,18 @@ pub fn drain_db_inbox(model: &SharedModel) {
             DbInboxEvent::TopScoresList(Err(err)) => {
                 m.menu_caches.top_scores_pending = false;
                 m.menu_caches.top_scores_error = Some(err);
+            }
+            DbInboxEvent::PasswordResetRequested(Ok(email)) => {
+                m.auth.recover_pending = false;
+                m.auth.last_error = None;
+                m.auth.notice = Some(format!(
+                    "Reset link sent to {email}. Check your inbox, then come back."
+                ));
+            }
+            DbInboxEvent::PasswordResetRequested(Err(err)) => {
+                m.auth.recover_pending = false;
+                m.auth.notice = None;
+                m.auth.last_error = Some(format!("Reset failed: {err}"));
             }
         }
     }

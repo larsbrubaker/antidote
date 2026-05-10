@@ -66,6 +66,9 @@ impl SignInOverlay {
             .with_margin(Insets::all(0.0))
             .on_change(move |s| *password_clone.borrow_mut() = s.to_owned());
 
+        // Status label: shows `auth.notice` in green when present, otherwise
+        // `auth.last_error` in red. `refresh_dynamic_text` swaps both text
+        // and color on each layout pass.
         let error_label = Label::new("", font.clone())
             .with_font_size(13.0)
             .with_align(LabelAlign::Center)
@@ -88,10 +91,17 @@ impl SignInOverlay {
             submit(&signup_model, &signup_email, &signup_password, true);
         });
 
+        let recover_model = model.clone();
+        let recover_email = email_buf.clone();
+        let forgot_btn = secondary_button("Forgot password?", font.clone(), move || {
+            request_password_reset(&recover_model, &recover_email);
+        });
+
         let back_model = model.clone();
         let back_btn = secondary_button("Back", font.clone(), move || {
             let mut m = back_model.borrow_mut();
             m.auth.last_error = None;
+            m.auth.notice = None;
             m.menu_view = MenuView::Main;
         });
 
@@ -117,6 +127,7 @@ impl SignInOverlay {
             Box::new(error_label),
             signin_btn,
             signup_btn,
+            forgot_btn,
         ];
         #[cfg(target_arch = "wasm32")]
         children.push(oauth_button(
@@ -135,15 +146,21 @@ impl SignInOverlay {
     }
 
     fn refresh_dynamic_text(&mut self) {
-        // Index 4 = error label. Mirror auth.last_error.
-        let text = self
-            .model
-            .borrow()
-            .auth
-            .last_error
-            .clone()
-            .unwrap_or_default();
+        // Index 4 = status label. `auth.notice` (green) wins over
+        // `auth.last_error` (red) so success confirmations don't get
+        // hidden by a stale error from a previous attempt.
+        let (text, color) = {
+            let m = self.model.borrow();
+            if let Some(notice) = m.auth.notice.as_deref() {
+                (notice.to_owned(), Color::rgba(0.55, 0.95, 0.65, 1.0))
+            } else if let Some(err) = m.auth.last_error.as_deref() {
+                (err.to_owned(), Color::rgba(1.0, 0.45, 0.45, 1.0))
+            } else {
+                (String::new(), Color::rgba(1.0, 0.45, 0.45, 1.0))
+            }
+        };
         self.children[4].set_label_text(&text);
+        self.children[4].set_label_color(color);
     }
 }
 
@@ -197,10 +214,12 @@ fn submit(
     let password = password_buf.borrow().clone();
     if email.trim().is_empty() || password.is_empty() {
         m.auth.last_error = Some("email and password required".to_owned());
+        m.auth.notice = None;
         return;
     }
     m.auth.pending = true;
     m.auth.last_error = None;
+    m.auth.notice = None;
     if sign_up {
         m.services
             .auth
@@ -210,6 +229,28 @@ fn submit(
             .auth
             .sign_in_async(&email, &password, &m.services.inbox);
     }
+}
+
+/// Stash the typed email on `auth.pending_recover_email` so the platform
+/// shell's per-frame [`crate::ui::drain_pending_password_reset`] hook can
+/// fire the actual REST call with the right `redirect_to`. Validates that
+/// the email field isn't empty up-front so the user gets immediate feedback.
+fn request_password_reset(model: &SharedModel, email_buf: &Rc<RefCell<String>>) {
+    let mut m = model.borrow_mut();
+    if m.auth.recover_pending {
+        return;
+    }
+    let email = email_buf.borrow().clone();
+    if email.trim().is_empty() {
+        m.auth.last_error =
+            Some("Enter your email above, then tap Forgot password.".to_owned());
+        m.auth.notice = None;
+        return;
+    }
+    m.auth.recover_pending = true;
+    m.auth.last_error = None;
+    m.auth.notice = None;
+    m.auth.pending_recover_email = Some(email);
 }
 
 impl Widget for SignInOverlay {

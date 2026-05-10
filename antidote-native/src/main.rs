@@ -261,6 +261,15 @@ fn main() {
                     &model,
                     "https://edupgibalgeqfujfkwmm.supabase.co/auth/v1/callback",
                 );
+                // Recovery email link → bring the user to the deployed
+                // web app, which already knows how to handle the
+                // recovery hash and offer a "set new password" UI.
+                // (The native shell can't host that flow until we ship
+                // a localhost-loopback server, same constraint as OAuth.)
+                antidote_core::ui::drain_pending_password_reset(
+                    &model,
+                    "https://larsbrubaker.github.io/antidote/",
+                );
                 if let Some(url) = model.borrow_mut().pending_open_url.take() {
                     if let Err(err) = webbrowser::open(&url) {
                         eprintln!("antidote: failed to open browser for OAuth: {err}");

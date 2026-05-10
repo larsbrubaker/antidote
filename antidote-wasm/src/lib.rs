@@ -192,6 +192,21 @@ fn drain_pending_oauth_with_origin() {
     antidote_core::ui::drain_pending_oauth(&model, &redirect_to);
 }
 
+/// Drain the "Forgot password?" click signal — Supabase emails the user a
+/// `#access_token=...&type=recovery` link pointing at this URL.
+fn drain_pending_password_reset_with_origin() {
+    let model: Option<SharedModel> = MODEL.with(|cell| cell.borrow().clone());
+    let Some(model) = model else { return };
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    let location = window.location();
+    let origin = location.origin().unwrap_or_default();
+    let pathname = location.pathname().unwrap_or_default();
+    let redirect_to = format!("{origin}{pathname}");
+    antidote_core::ui::drain_pending_password_reset(&model, &redirect_to);
+}
+
 /// Wasm-bindgen entry point the TS shell calls on page load when it
 /// detects an OAuth callback fragment in `window.location.hash`. The
 /// session is registered the same way email/password sign-ins land — via
@@ -259,6 +274,7 @@ pub fn render(width: u32, height: u32, _frame_ms: f64) {
     }
     ensure_app();
     drain_pending_oauth_with_origin();
+    drain_pending_password_reset_with_origin();
     drain_pending_open_url();
     ensure_wgpu_ctx(width as f32, height as f32);
     resize_surface_if_needed(width, height);

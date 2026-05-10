@@ -36,6 +36,12 @@ pub enum DbInboxEvent {
     /// Each row is a [`LeaderboardEntry`] with the user's `handle` instead
     /// of their `user_id` UUID — see migration 0004.
     TopScoresList(Result<Vec<LeaderboardEntry>, String>),
+    /// Result of [`crate::db::auth::AuthClient::request_password_reset_async`].
+    /// Supabase returns 200 with an empty body whether the email exists or
+    /// not (anti-enumeration), so success here just means the request was
+    /// accepted. The Ok variant carries the email we asked about so the UI
+    /// can echo it in the confirmation message.
+    PasswordResetRequested(Result<String, String>),
 }
 
 /// Persisted Supabase session — lives in [`SharedModel`] for as long as the

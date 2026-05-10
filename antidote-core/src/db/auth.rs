@@ -84,6 +84,68 @@ impl AuthClient {
         );
     }
 
+    /// Fire-and-forget password-recovery request. Supabase emails the
+    /// address a `#access_token=...&type=recovery` link pointing at
+    /// `redirect_to` (must be in the project's Allowed Redirect URLs).
+    /// The web shell catches the recovery hash on load and shows a
+    /// "set new password" UI; native users open the link in a browser.
+    ///
+    /// Supabase returns 200 with no body whether the address exists or not
+    /// (anti-enumeration), so the only failure modes are network / 4xx.
+    pub fn request_password_reset_async(&self, email: &str, redirect_to: &str, inbox: &DbInbox) {
+        let url = format!("{}/auth/v1/recover", self.base_url);
+        let body = serde_json::json!({
+            "email": email,
+            "redirect_to": redirect_to,
+        });
+        let body_bytes = serde_json::to_vec(&body).unwrap_or_default();
+        let mut req = ehttp::Request::post(url, body_bytes);
+        req.headers
+            .insert("Content-Type".to_owned(), "application/json".to_owned());
+        req.headers
+            .insert("apikey".to_owned(), self.anon_key.clone());
+
+        let tx = inbox.tx.clone();
+        let email_owned = email.to_owned();
+        ehttp::fetch(req, move |result| {
+            let event = DbInboxEvent::PasswordResetRequested(parse_recover_response(
+                result,
+                email_owned,
+            ));
+            let _ = tx.send(event);
+        });
+    }
+
+    /// Update the currently-signed-in user's password. Bearer-authed
+    /// (`PUT /auth/v1/user`) — caller must have set the access token from
+    /// the recovery callback first.
+    pub fn update_password_async(&self, access_token: &str, new_password: &str, inbox: &DbInbox) {
+        let url = format!("{}/auth/v1/user", self.base_url);
+        let body = serde_json::json!({ "password": new_password });
+        let body_bytes = serde_json::to_vec(&body).unwrap_or_default();
+        let mut req = ehttp::Request {
+            method: "PUT".to_owned(),
+            url,
+            body: body_bytes,
+            headers: std::collections::BTreeMap::new(),
+        };
+        req.headers
+            .insert("Content-Type".to_owned(), "application/json".to_owned());
+        req.headers
+            .insert("apikey".to_owned(), self.anon_key.clone());
+        req.headers.insert(
+            "Authorization".to_owned(),
+            format!("Bearer {access_token}"),
+        );
+
+        let tx = inbox.tx.clone();
+        let email = String::new();
+        ehttp::fetch(req, move |result| {
+            let event = DbInboxEvent::PasswordResetRequested(parse_recover_response(result, email));
+            let _ = tx.send(event);
+        });
+    }
+
     /// Build the URL the platform shell should navigate to (web) or open in
     /// the system browser (native) to start an OAuth flow. Supabase will
     /// redirect to `redirect_to` after the provider completes the round
@@ -274,6 +336,25 @@ fn parse_token_response(
         user_id,
         email: session_email,
     })
+}
+
+/// Parse `/auth/v1/recover` (or `PUT /auth/v1/user`) response. Body is
+/// empty on success; `email` is echoed back on Ok so the UI can include it
+/// in the confirmation toast.
+fn parse_recover_response(
+    result: Result<ehttp::Response, String>,
+    email: String,
+) -> Result<String, String> {
+    let resp = result.map_err(|e| format!("network: {e}"))?;
+    if !resp.ok {
+        let body = std::str::from_utf8(&resp.bytes).unwrap_or("");
+        let raw = serde_json::from_str::<ErrorResponse>(body)
+            .ok()
+            .and_then(|e| e.msg.or(e.error_description).or(e.message))
+            .unwrap_or_else(|| body.to_owned());
+        return Err(format!("{}: {}", resp.status, raw));
+    }
+    Ok(email)
 }
 
 /// Map common Supabase Auth error strings to player-friendly text. Falls
