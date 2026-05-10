@@ -23,9 +23,11 @@ use agg_gui::widgets::label::{Label, LabelAlign};
 use agg_gui::widgets::text_field::TextField;
 use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
+#[cfg(target_arch = "wasm32")]
 use crate::db::auth::OAuthProvider;
 use crate::game::state::Phase;
 use crate::ui::game_model::{MenuView, SharedModel};
+#[cfg(target_arch = "wasm32")]
 use crate::ui::google_signin_button::GoogleSignInButton;
 use crate::ui::menu_widget::{
     body_label, header_label, layout_centered_column, paint_backdrop, primary_button,
@@ -156,6 +158,11 @@ impl SignInOverlay {
 /// label — Google's brand guidelines mandate the logo. Other providers
 /// fall back to the standard secondary-button look until we ship matching
 /// branding for each.
+///
+/// Gated to wasm32 because the OAuth round trip needs a same-origin
+/// browser redirect to capture the access-token fragment; the native
+/// shell can't do that until a localhost-loopback handler lands.
+#[cfg(target_arch = "wasm32")]
 fn oauth_button(provider: OAuthProvider, font: Arc<Font>, model: SharedModel) -> Box<dyn Widget> {
     let click = move || {
         let mut m = model.borrow_mut();
