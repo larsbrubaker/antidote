@@ -64,6 +64,7 @@ impl AuthClient {
             password,
             inbox,
             DbInboxEvent::SignInResult,
+            AuthFlow::SignIn,
         );
     }
 
@@ -79,6 +80,7 @@ impl AuthClient {
             password,
             inbox,
             DbInboxEvent::SignUpResult,
+            AuthFlow::SignUp,
         );
     }
 
@@ -131,6 +133,7 @@ impl AuthClient {
         password: &str,
         inbox: &DbInbox,
         wrap: fn(Result<Session, String>) -> DbInboxEvent,
+        flow: AuthFlow,
     ) {
         let url = format!("{}{}", self.base_url, path);
         let body = serde_json::json!({
@@ -147,10 +150,19 @@ impl AuthClient {
         let tx = inbox.tx.clone();
         let email_owned = email.to_owned();
         ehttp::fetch(req, move |result| {
-            let event = wrap(parse_token_response(result, email_owned));
+            let event = wrap(parse_token_response(result, email_owned, flow));
             let _ = tx.send(event);
         });
     }
+}
+
+/// Which auth path produced a response — controls error-message wording so
+/// the UI can show "check your inbox" on sign-up but "wrong password" on
+/// sign-in for the same underlying Supabase status code.
+#[derive(Clone, Copy, Debug)]
+enum AuthFlow {
+    SignIn,
+    SignUp,
 }
 
 #[derive(Debug, Deserialize)]
@@ -226,21 +238,23 @@ fn parse_jwt_payload(jwt: &str) -> Option<(String, Option<String>)> {
 fn parse_token_response(
     result: Result<ehttp::Response, String>,
     email: String,
+    flow: AuthFlow,
 ) -> Result<Session, String> {
     let resp = result.map_err(|e| format!("network: {e}"))?;
     if !resp.ok {
         let body = std::str::from_utf8(&resp.bytes).unwrap_or("");
-        let msg = serde_json::from_str::<ErrorResponse>(body)
+        let raw = serde_json::from_str::<ErrorResponse>(body)
             .ok()
             .and_then(|e| e.msg.or(e.error_description).or(e.message))
             .unwrap_or_else(|| body.to_owned());
-        return Err(format!("{}: {}", resp.status, msg));
+        return Err(humanize_auth_error(&raw, flow));
     }
     let parsed: TokenResponse =
         serde_json::from_slice(&resp.bytes).map_err(|e| format!("parse: {e}"))?;
-    let access_token = parsed
-        .access_token
-        .ok_or("no access_token returned (email confirmation may be required)")?;
+    let access_token = match parsed.access_token {
+        Some(t) => t,
+        None => return Err(no_token_message(flow)),
+    };
     let refresh_token = parsed.refresh_token.unwrap_or_default();
     let expires_in = parsed.expires_in.unwrap_or(3600);
     let now = web_time::SystemTime::now()
@@ -260,4 +274,45 @@ fn parse_token_response(
         user_id,
         email: session_email,
     })
+}
+
+/// Map common Supabase Auth error strings to player-friendly text. Falls
+/// through to the raw message so anything we haven't seen yet still surfaces
+/// rather than swallowing the diagnostic.
+fn humanize_auth_error(raw: &str, flow: AuthFlow) -> String {
+    let lower = raw.to_lowercase();
+    if lower.contains("invalid login credentials") || lower.contains("invalid_grant") {
+        return "Email or password is incorrect.".to_owned();
+    }
+    if lower.contains("email not confirmed") {
+        return "Email not confirmed yet. Check your inbox for the confirmation link, then sign in.".to_owned();
+    }
+    if lower.contains("user already registered") || lower.contains("already been registered") {
+        return "An account with this email already exists. Use Sign in instead.".to_owned();
+    }
+    if lower.contains("password should be at least") {
+        return raw.to_owned();
+    }
+    if lower.contains("rate limit") || lower.contains("too many") {
+        return "Too many attempts. Wait a minute and try again.".to_owned();
+    }
+    match flow {
+        AuthFlow::SignIn => format!("Sign-in failed: {raw}"),
+        AuthFlow::SignUp => format!("Sign-up failed: {raw}"),
+    }
+}
+
+/// Message shown when the response is 200 OK but carries no `access_token`.
+/// On sign-up that's the normal "check your email to confirm" path; on
+/// sign-in it shouldn't happen, but if it does we'd rather say something
+/// useful than the raw "no access_token" diagnostic.
+fn no_token_message(flow: AuthFlow) -> String {
+    match flow {
+        AuthFlow::SignUp => {
+            "Account created. Check your email for a confirmation link, then sign in.".to_owned()
+        }
+        AuthFlow::SignIn => {
+            "Sign-in succeeded but no session was returned. Try again, or confirm your email if you just signed up.".to_owned()
+        }
+    }
 }
