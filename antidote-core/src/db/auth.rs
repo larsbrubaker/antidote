@@ -108,10 +108,8 @@ impl AuthClient {
         let tx = inbox.tx.clone();
         let email_owned = email.to_owned();
         ehttp::fetch(req, move |result| {
-            let event = DbInboxEvent::PasswordResetRequested(parse_recover_response(
-                result,
-                email_owned,
-            ));
+            let event =
+                DbInboxEvent::PasswordResetRequested(parse_recover_response(result, email_owned));
             let _ = tx.send(event);
         });
     }
@@ -133,10 +131,8 @@ impl AuthClient {
             .insert("Content-Type".to_owned(), "application/json".to_owned());
         req.headers
             .insert("apikey".to_owned(), self.anon_key.clone());
-        req.headers.insert(
-            "Authorization".to_owned(),
-            format!("Bearer {access_token}"),
-        );
+        req.headers
+            .insert("Authorization".to_owned(), format!("Bearer {access_token}"));
 
         let tx = inbox.tx.clone();
         ehttp::fetch(req, move |result| {

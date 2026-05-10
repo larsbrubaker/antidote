@@ -242,8 +242,7 @@ fn request_password_reset(model: &SharedModel, email_buf: &Rc<RefCell<String>>) 
     }
     let email = email_buf.borrow().clone();
     if email.trim().is_empty() {
-        m.auth.last_error =
-            Some("Enter your email above, then tap Forgot password.".to_owned());
+        m.auth.last_error = Some("Enter your email above, then tap Forgot password.".to_owned());
         m.auth.notice = None;
         return;
     }

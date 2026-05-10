@@ -121,8 +121,7 @@ fn submit_new_password(model: &SharedModel, password_buf: &Rc<RefCell<String>>) 
         return;
     }
     let Some(token) = m.auth.recovery_access_token.clone() else {
-        m.auth.last_error =
-            Some("Recovery session expired. Request a new reset link.".to_owned());
+        m.auth.last_error = Some("Recovery session expired. Request a new reset link.".to_owned());
         return;
     };
     m.auth.pending = true;
