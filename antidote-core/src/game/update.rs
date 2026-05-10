@@ -219,9 +219,23 @@ fn grow_bubble(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
     // Normal growth.
     g.radius += BUBBLE_GROW_RATE * dt;
 
-    // Pin to walls (don't freeze).
-    g.x = g.x.clamp(g.radius, VIRTUAL_WIDTH - g.radius);
-    g.y = g.y.clamp(g.radius, VIRTUAL_HEIGHT - g.radius);
+    // Pin to walls (don't freeze). Use per-side checks rather than
+    // `f32::clamp(g.radius, W - g.radius)`: once the bubble outgrows the
+    // shorter playfield axis (radius > VIRTUAL_HEIGHT / 2) the clamp's
+    // `min > max` invariant fails and rust panics, which under WASM stops the
+    // rAF loop and looks like a hang. This mirrors antidote-core.js:222-233.
+    if g.x - g.radius < 0.0 {
+        g.x = g.radius;
+    }
+    if g.x + g.radius > VIRTUAL_WIDTH {
+        g.x = VIRTUAL_WIDTH - g.radius;
+    }
+    if g.y - g.radius < 0.0 {
+        g.y = g.radius;
+    }
+    if g.y + g.radius > VIRTUAL_HEIGHT {
+        g.y = VIRTUAL_HEIGHT - g.radius;
+    }
 
     // Resize the rapier collider only when the radius has moved meaningfully —
     // tearing down + recreating a collider every frame is expensive. 0.5 px
@@ -288,6 +302,10 @@ fn constrain_bubble_position(
     solid_bubbles: &[Bubble],
     dead_viruses: &[DeadVirus],
 ) -> Option<(f32, f32)> {
+    // Bubble doesn't fit on either axis — no valid position.
+    if radius * 2.0 > VIRTUAL_WIDTH || radius * 2.0 > VIRTUAL_HEIGHT {
+        return None;
+    }
     let x = target_x.clamp(radius, VIRTUAL_WIDTH - radius);
     let y = target_y.clamp(radius, VIRTUAL_HEIGHT - radius);
     for b in solid_bubbles {
@@ -632,5 +650,41 @@ mod tests {
 
         assert_eq!(world.phase, Phase::GameOver);
         assert_eq!(world.phase_elapsed, 0.0);
+    }
+
+    /// Holding the pointer long enough for a bubble to outgrow the playfield's
+    /// shorter axis must not panic. The wall-pin code originally used
+    /// `f32::clamp(g.radius, H - g.radius)`, which panics when
+    /// `g.radius > H / 2` because `min > max`. Symptom in WASM was a frozen
+    /// canvas the moment a bubble grew tall enough to touch top and bottom.
+    #[test]
+    fn growing_bubble_can_exceed_playfield_height_without_panicking() {
+        let mut world = World::new();
+        let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        level_init(&mut world, &mut physics);
+        // Move every virus far away so they don't pop the bubble mid-grow.
+        for v in world.viruses.iter_mut() {
+            v.x = 50.0;
+            v.y = 50.0;
+            v.vx = 0.0;
+            v.vy = 0.0;
+            v.last_unstuck_x = 50.0;
+            v.last_unstuck_y = 50.0;
+            if let Some(handle) = v.body {
+                physics.set_body_position(handle, 50.0, 50.0);
+                physics.zero_body_velocity(handle);
+            }
+        }
+        // Spend the antidote budget growing one big bubble in the centre.
+        on_pointer_down(&mut world, &mut physics, 400.0, 300.0);
+        // 20 seconds of growth at 80 px/s is far past the playfield height —
+        // enough to drive radius well over VIRTUAL_HEIGHT/2 = 300 and trip
+        // the old clamp panic.
+        for _ in 0..1200 {
+            tick(&mut world, &mut physics, 1.0 / 60.0);
+        }
+        // Either the bubble is still growing past the playfield, or antidote
+        // ran out and froze it — either way the game must still be running.
+        assert_ne!(world.phase, Phase::GameOver);
     }
 }
