@@ -221,6 +221,23 @@ pub fn apply_settings_json(json: String) -> bool {
     m.apply_settings_json(&json)
 }
 
+/// Called by the JS shell each frame. If the menu bar's Fullscreen button
+/// set `model.pending_fullscreen_toggle`, returns `true` exactly once so
+/// the JS side can call `requestFullscreen` / `exitFullscreen` on the very
+/// next frame — still inside the user-gesture window from the click.
+#[wasm_bindgen]
+pub fn drain_pending_fullscreen_toggle() -> bool {
+    let Some(model) = shared_model_clone() else {
+        return false;
+    };
+    let mut m = model.borrow_mut();
+    if !m.pending_fullscreen_toggle {
+        return false;
+    }
+    m.pending_fullscreen_toggle = false;
+    true
+}
+
 fn ensure_wgpu_ctx(width: f32, height: f32) {
     WGPU_CTX.with(|ctx_cell| {
         if ctx_cell.borrow().is_some() {

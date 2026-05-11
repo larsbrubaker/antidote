@@ -54,44 +54,40 @@ async function main() {
     };
   };
 
-  // Mobile: on the first tap, ask the browser for fullscreen so the
-  // URL/address bar disappears and the playfield gets the entire
-  // viewport. Required to be called from a user gesture; we hook it
-  // into the canvas pointerdown handler. No-ops if already fullscreen,
-  // or if the device isn't touch-capable, or if requestFullscreen
-  // isn't supported (iOS Safari has its own bag of quirks — there a
-  // separate "Add to Home Screen" launch is the way to remove the URL
-  // bar). Mirrors Solitaire, which is the known-working mobile
-  // sibling: target `document.documentElement` (the canvas-targeted
-  // variant we tried earlier didn't activate on the user's Pixel) and
-  // reset `fullscreenAttempted` on rejection so a future tap can
-  // retry.
-  let fullscreenAttempted = false;
-  const maybeRequestFullscreen = () => {
-    if (fullscreenAttempted) return;
-    if (document.fullscreenElement) {
-      fullscreenAttempted = true;
-      return;
-    }
-    const isTouch =
-      (navigator.maxTouchPoints ?? 0) > 0 || "ontouchstart" in window;
-    if (!isTouch) return;
-    fullscreenAttempted = true;
+  // Fullscreen is no longer auto-triggered on the first tap — the unsolicited
+  // chrome-collapse was jarring. Instead, the menu bar's Fullscreen button
+  // sets `model.pending_fullscreen_toggle`; we drain that flag and toggle
+  // here. Browser fullscreen state is the source of truth on the JS side, so
+  // the same button enters or exits depending on `document.fullscreenElement`.
+  const toggleFullscreen = () => {
     const el = document.documentElement as HTMLElement & {
       webkitRequestFullscreen?: () => Promise<void>;
     };
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void>;
+    };
+    if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+      const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen;
+      if (exit) {
+        Promise.resolve(exit.call(doc)).catch((err) => {
+          console.warn("antidote: exitFullscreen rejected:", err);
+        });
+      }
+      return;
+    }
     const req = el.requestFullscreen ?? el.webkitRequestFullscreen;
-    if (!req) return;
-    Promise.resolve(req.call(el)).catch(() => {
-      // User denied or browser doesn't allow it on this gesture — let
-      // a future tap try again.
-      fullscreenAttempted = false;
+    if (!req) {
+      console.warn("antidote: Fullscreen API not available on this browser");
+      return;
+    }
+    Promise.resolve(req.call(el)).catch((err) => {
+      console.warn("antidote: requestFullscreen rejected:", err);
     });
   };
 
   canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    maybeRequestFullscreen();
     canvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event);
     wasm.on_mouse_down(point.x, point.y, event.button);
@@ -174,6 +170,15 @@ async function main() {
     URL.revokeObjectURL(url);
   };
 
+  // Menu bar's Fullscreen button sets `model.pending_fullscreen_toggle`;
+  // drain it each frame and toggle. The wasm flag was set inside the user
+  // gesture, and we drain on the very next rAF — still inside the gesture
+  // window the Fullscreen API requires.
+  const drainFullscreenToggle = () => {
+    if (!wasm.drain_pending_fullscreen_toggle?.()) return;
+    toggleFullscreen();
+  };
+
   // File → Import… sets `model.pending_import`. When drained, open a hidden
   // file input; the user-gesture context from the menu click carries through
   // because the wasm `pending_import` flag was set inside the same gesture
@@ -210,6 +215,7 @@ async function main() {
     }
     drainExport();
     drainImport();
+    drainFullscreenToggle();
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

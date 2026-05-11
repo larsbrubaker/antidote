@@ -63,6 +63,10 @@ pub struct GameModel {
     /// drains this each frame and opens a file picker; the selected file's
     /// JSON is fed back into `apply_settings_json`.
     pub pending_import: bool,
+    /// Set to `true` by the menu bar's Fullscreen button. The platform shell
+    /// drains this each frame and toggles browser fullscreen — entering if
+    /// not currently fullscreen, exiting if so. Cleared by the drain.
+    pub pending_fullscreen_toggle: bool,
 }
 
 impl GameModel {
@@ -79,6 +83,7 @@ impl GameModel {
             menu_view: MenuView::Main,
             pending_export: false,
             pending_import: false,
+            pending_fullscreen_toggle: false,
         }
     }
 

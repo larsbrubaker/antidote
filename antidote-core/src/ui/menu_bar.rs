@@ -26,8 +26,10 @@ pub const MENU_BAR_HEIGHT: f64 = 36.0;
 const PAD_X: f64 = 12.0;
 /// Gap between adjacent menu-bar buttons.
 const ITEM_GAP: f64 = 4.0;
-/// Width of each top-level menu button.
+/// Width of File / Help (short-text) menu buttons.
 const ITEM_W: f64 = 72.0;
+/// Width of the wider Fullscreen button.
+const WIDE_ITEM_W: f64 = 116.0;
 /// Font size for the menu-bar text.
 const FONT_SIZE: f64 = 15.0;
 
@@ -41,12 +43,16 @@ impl MenuBar {
     pub fn new(model: SharedModel, font: Arc<Font>) -> Self {
         let file_model = model.clone();
         let help_model = model.clone();
+        let fullscreen_model = model.clone();
         let children: Vec<Box<dyn Widget>> = vec![
-            menu_bar_button("File", font.clone(), move || {
+            menu_bar_button("File", ITEM_W, font.clone(), move || {
                 file_model.borrow_mut().menu_view = MenuView::File;
             }),
-            menu_bar_button("Help", font, move || {
+            menu_bar_button("Help", ITEM_W, font.clone(), move || {
                 help_model.borrow_mut().menu_view = MenuView::Help;
+            }),
+            menu_bar_button("Fullscreen", WIDE_ITEM_W, font, move || {
+                fullscreen_model.borrow_mut().pending_fullscreen_toggle = true;
             }),
         ];
         Self {
@@ -59,6 +65,7 @@ impl MenuBar {
 
 fn menu_bar_button(
     text: &str,
+    width: f64,
     font: Arc<Font>,
     on_click: impl FnMut() + 'static,
 ) -> Box<dyn Widget> {
@@ -73,7 +80,7 @@ fn menu_bar_button(
         Button::new(text, font)
             .with_font_size(FONT_SIZE)
             .with_theme(theme)
-            .with_min_size(Size::new(ITEM_W, MENU_BAR_HEIGHT - 6.0))
+            .with_min_size(Size::new(width, MENU_BAR_HEIGHT - 6.0))
             .on_click(on_click),
     )
 }
@@ -112,11 +119,21 @@ impl Widget for MenuBar {
         let bar_y = h - MENU_BAR_HEIGHT;
         let pad_y = (MENU_BAR_HEIGHT - (MENU_BAR_HEIGHT - 6.0)) * 0.5;
         let item_h = MENU_BAR_HEIGHT - 6.0;
+        // Layout: File + Help at the left edge, Fullscreen flush against
+        // the right edge — matches the convention that view-mode toggles
+        // (zoom, fullscreen) sit opposite the menu group.
         let mut cursor_x = PAD_X;
-        for child in self.children.iter_mut() {
-            let s = child.layout(Size::new(ITEM_W, item_h));
-            child.set_bounds(Rect::new(cursor_x, bar_y + pad_y, s.width, s.height));
-            cursor_x += s.width + ITEM_GAP;
+        let count = self.children.len();
+        let last_idx = count.saturating_sub(1);
+        for (i, child) in self.children.iter_mut().enumerate() {
+            let s = child.layout(Size::new(WIDE_ITEM_W, item_h));
+            if i == last_idx && count > 1 {
+                let x = (available.width - PAD_X - s.width).max(cursor_x);
+                child.set_bounds(Rect::new(x, bar_y + pad_y, s.width, s.height));
+            } else {
+                child.set_bounds(Rect::new(cursor_x, bar_y + pad_y, s.width, s.height));
+                cursor_x += s.width + ITEM_GAP;
+            }
         }
         available
     }
