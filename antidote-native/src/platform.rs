@@ -1,44 +1,44 @@
-//! Native `BestScoreStore` impl — JSON file under
-//! `dirs::data_dir()/antidote/best_score.json`.
+//! Native `SettingsStore` impl — JSON file under
+//! `dirs::data_dir()/antidote/settings.json`.
 
-use antidote_core::platform::BestScoreStore;
+use antidote_core::platform::{in_memory_settings_store, Settings, SettingsStore};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub struct FileBestScoreStore {
+pub struct FileSettingsStore {
     path: PathBuf,
 }
 
-impl FileBestScoreStore {
+impl FileSettingsStore {
     pub fn new() -> Option<Self> {
         let mut p = dirs::data_dir()?;
         p.push("antidote");
         let _ = fs::create_dir_all(&p);
-        p.push("best_score.json");
+        p.push("settings.json");
         Some(Self { path: p })
     }
 
-    /// Construct an `Arc<dyn BestScoreStore>` — falls back to an in-memory
+    /// Construct an `Arc<dyn SettingsStore>` — falls back to an in-memory
     /// store if the data dir can't be resolved (e.g. no `$HOME`). Callers
     /// shouldn't have to care which they got.
-    pub fn into_shared() -> Arc<dyn BestScoreStore> {
+    pub fn into_shared() -> Arc<dyn SettingsStore> {
         match Self::new() {
             Some(store) => Arc::new(store),
-            None => antidote_core::platform::in_memory_best_score_store(),
+            None => in_memory_settings_store(),
         }
     }
 }
 
-impl BestScoreStore for FileBestScoreStore {
-    fn load(&self) -> u64 {
+impl SettingsStore for FileSettingsStore {
+    fn load(&self) -> Settings {
         let Ok(bytes) = fs::read(&self.path) else {
-            return 0;
+            return Settings::default();
         };
-        serde_json::from_slice::<u64>(&bytes).unwrap_or(0)
+        serde_json::from_slice::<Settings>(&bytes).unwrap_or_default()
     }
-    fn save(&self, score: u64) {
-        if let Ok(bytes) = serde_json::to_vec(&score) {
+    fn save(&self, settings: &Settings) {
+        if let Ok(bytes) = serde_json::to_vec_pretty(settings) {
             let _ = fs::write(&self.path, bytes);
         }
     }

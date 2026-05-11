@@ -36,7 +36,7 @@ use winit::window::{Window, WindowAttributes};
 
 mod platform;
 
-use platform::FileBestScoreStore;
+use platform::FileSettingsStore;
 
 struct Gpu {
     device: Arc<wgpu::Device>,
@@ -133,7 +133,7 @@ fn main() {
 
     let mut gpu = Gpu::new(window.clone());
 
-    let (mut app, _model) = build_antidote_app_with_store(FileBestScoreStore::into_shared());
+    let (mut app, _model) = build_antidote_app_with_store(FileSettingsStore::into_shared());
     let mut wgpu_ctx = WgpuGfxCtx::new(
         Arc::clone(&gpu.device),
         Arc::clone(&gpu.queue),

@@ -22,7 +22,7 @@ use web_time::Instant;
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::physics::PhysicsWorld;
 use crate::game::state::World;
-use crate::platform::{in_memory_best_score_store, BestScoreStore};
+use crate::platform::{in_memory_settings_store, SavedSession, Settings, SettingsStore};
 use agg_gui::timestep::FixedTimestep;
 
 /// Owning state for the running game. Held inside [`SharedModel`].
@@ -35,55 +35,96 @@ pub struct GameModel {
     /// into the fixed timestep accumulator.
     pub last_paint: Option<Instant>,
     pub timestep: FixedTimestep,
-    /// Highest `world.total_score` ever recorded on this device. Loaded from
-    /// the platform store at construction and rewritten whenever
-    /// `total_score` climbs past it.
-    pub best_score: u64,
-    best_score_store: Arc<dyn BestScoreStore>,
+    /// Local persistent player state — best score, recent scores, and the
+    /// optional resume snapshot. Read on every layout pass by the main menu;
+    /// rewritten whenever the player beats their best score, finishes a
+    /// level / runs out of lives, or starts a fresh game.
+    pub settings: Settings,
+    settings_store: Arc<dyn SettingsStore>,
 }
 
 impl GameModel {
-    pub fn new(best_score_store: Arc<dyn BestScoreStore>) -> Self {
-        let best_score = best_score_store.load();
+    pub fn new(settings_store: Arc<dyn SettingsStore>) -> Self {
+        let settings = settings_store.load();
         Self {
             world: World::new(),
             physics: PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT),
             epoch: Instant::now(),
             last_paint: None,
             timestep: FixedTimestep::new(),
-            best_score,
-            best_score_store,
+            settings,
+            settings_store,
         }
+    }
+
+    /// Flush `settings` to the platform store. Cheap (one JSON serialize +
+    /// one filesystem / `localStorage` write); call from any code path that
+    /// just mutated `settings`.
+    pub fn save_settings(&self) {
+        self.settings_store.save(&self.settings);
     }
 
     /// Persist a new best score if the current session has beaten the
     /// previous record. Cheap when called every frame — the comparison
-    /// short-circuits the common case.
+    /// short-circuits the common case. Called from `GameWidget::paint`.
     pub fn maybe_record_best_score(&mut self) {
-        if self.world.total_score > self.best_score {
-            self.best_score = self.world.total_score;
-            self.best_score_store.save(self.best_score);
+        if self.world.total_score > self.settings.best_score {
+            self.settings.best_score = self.world.total_score;
+            self.save_settings();
         }
+    }
+
+    /// Remember where the player is so the main menu's `Resume` button
+    /// drops them back here. Call when a level finishes successfully or when
+    /// the player pauses out to the menu — anywhere the current world state
+    /// represents a useful place to come back to.
+    pub fn record_saved_session(&mut self) {
+        self.settings.saved_session = Some(SavedSession {
+            level: self.world.level,
+            total_score: self.world.total_score,
+            lives: self.world.lives,
+        });
+        self.save_settings();
+    }
+
+    /// Drop any persisted resume snapshot. Called from `New game` and from
+    /// the `GameOver` finalization so a fresh launch shows the start
+    /// experience, not a stale "Resume from level 5" carry-over.
+    pub fn clear_saved_session(&mut self) {
+        if self.settings.saved_session.take().is_some() {
+            self.save_settings();
+        }
+    }
+
+    /// Append a finished session to `recent_scores` and bump `best_score`
+    /// if applicable. Called when a session ends — either via `GameOver` or
+    /// by the player explicitly returning to the menu mid-run.
+    pub fn record_finished_session(&mut self, score: u64, level: u32) {
+        if score == 0 {
+            return; // Don't pollute the list with zero-score abandons.
+        }
+        self.settings.record_finished_session(score, level);
+        self.save_settings();
     }
 }
 
 impl Default for GameModel {
     fn default() -> Self {
-        Self::new(in_memory_best_score_store())
+        Self::new(in_memory_settings_store())
     }
 }
 
 /// Reference-counted handle that every widget holds a clone of.
 pub type SharedModel = Rc<RefCell<GameModel>>;
 
-/// Convenience constructor with an in-memory best-score store. Tests use this;
-/// production shells pass a real `Arc<dyn BestScoreStore>` via
+/// Convenience constructor with an in-memory settings store. Tests use this;
+/// production shells pass a real `Arc<dyn SettingsStore>` via
 /// [`shared_with_store`].
 pub fn shared() -> SharedModel {
     Rc::new(RefCell::new(GameModel::default()))
 }
 
-/// Constructor that accepts a real best-score store from a platform shell.
-pub fn shared_with_store(store: Arc<dyn BestScoreStore>) -> SharedModel {
+/// Constructor that accepts a real settings store from a platform shell.
+pub fn shared_with_store(store: Arc<dyn SettingsStore>) -> SharedModel {
     Rc::new(RefCell::new(GameModel::new(store)))
 }

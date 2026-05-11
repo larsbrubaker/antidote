@@ -1,21 +1,21 @@
-//! Wasm `BestScoreStore` impl — `localStorage["antidote_best_score"]`.
+//! Wasm `SettingsStore` impl — `localStorage["antidote_settings"]`.
 
-use antidote_core::platform::BestScoreStore;
+use antidote_core::platform::{Settings, SettingsStore};
 use std::sync::Arc;
 
-const KEY: &str = "antidote_best_score";
+const KEY: &str = "antidote_settings";
 
-pub struct LocalStorageBestScoreStore;
+pub struct LocalStorageSettingsStore;
 
-impl LocalStorageBestScoreStore {
+impl LocalStorageSettingsStore {
     pub fn new() -> Self {
         Self
     }
 
-    /// Construct an `Arc<dyn BestScoreStore>` — backed by `localStorage`
+    /// Construct an `Arc<dyn SettingsStore>` — backed by `localStorage`
     /// when available, and by an in-memory store otherwise (e.g. when
     /// `localStorage` is disabled or unavailable).
-    pub fn into_shared() -> Arc<dyn BestScoreStore> {
+    pub fn into_shared() -> Arc<dyn SettingsStore> {
         Arc::new(Self::new())
     }
 
@@ -24,25 +24,27 @@ impl LocalStorageBestScoreStore {
     }
 }
 
-impl Default for LocalStorageBestScoreStore {
+impl Default for LocalStorageSettingsStore {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BestScoreStore for LocalStorageBestScoreStore {
-    fn load(&self) -> u64 {
+impl SettingsStore for LocalStorageSettingsStore {
+    fn load(&self) -> Settings {
         let Some(ls) = Self::ls() else {
-            return 0;
+            return Settings::default();
         };
         let Ok(Some(s)) = ls.get_item(KEY) else {
-            return 0;
+            return Settings::default();
         };
-        s.parse::<u64>().unwrap_or(0)
+        serde_json::from_str::<Settings>(&s).unwrap_or_default()
     }
-    fn save(&self, score: u64) {
+    fn save(&self, settings: &Settings) {
         if let Some(ls) = Self::ls() {
-            let _ = ls.set_item(KEY, &score.to_string());
+            if let Ok(s) = serde_json::to_string(settings) {
+                let _ = ls.set_item(KEY, &s);
+            }
         }
     }
 }

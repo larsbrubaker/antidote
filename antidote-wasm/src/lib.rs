@@ -32,7 +32,7 @@ use std::sync::Arc;
 use agg_gui::{App, Key, Modifiers, MouseButton};
 use antidote_core::ui::build_antidote_app_with_store;
 use demo_wgpu::{begin_frame, WgpuGfxCtx};
-use platform::LocalStorageBestScoreStore;
+use platform::LocalStorageSettingsStore;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -162,8 +162,7 @@ fn ensure_app() {
         // The widget tree owns clones of the SharedModel internally, so we
         // can drop our handle here — there's no longer any out-of-tree
         // consumer that needs it.
-        let (app, _model) =
-            build_antidote_app_with_store(LocalStorageBestScoreStore::into_shared());
+        let (app, _model) = build_antidote_app_with_store(LocalStorageSettingsStore::into_shared());
         *cell.borrow_mut() = Some(app);
     });
 }

@@ -138,43 +138,137 @@ pub struct MainMenuOverlay {
     bounds: Rect,
     children: Vec<Box<dyn Widget>>,
     model: SharedModel,
+    font: Arc<Font>,
+    /// Cached `(saved_session.level/score/lives, recent_scores.len, best_score)`
+    /// from the last `rebuild_children` call. Used to skip rebuilds when
+    /// nothing the menu shows has actually changed.
+    cache_key: MenuCacheKey,
+}
+
+#[derive(Default, Clone, PartialEq, Eq)]
+struct MenuCacheKey {
+    saved: Option<(u32, u64, u8)>,
+    scores_len: usize,
+    best: u64,
 }
 
 impl MainMenuOverlay {
     pub fn new(model: SharedModel, font: Arc<Font>) -> Self {
-        let play_model = model.clone();
-        let children: Vec<Box<dyn Widget>> = vec![
+        let mut s = Self {
+            bounds: Rect::default(),
+            children: Vec::new(),
+            model,
+            font,
+            cache_key: MenuCacheKey::default(),
+        };
+        s.rebuild_children();
+        s
+    }
+
+    /// Build the children vector from the current `Settings`. Buttons capture
+    /// closures that mutate the model; cheap enough to redo each time
+    /// settings change (which happens at most once per level transition).
+    fn rebuild_children(&mut self) {
+        let font = self.font.clone();
+        let settings = self.model.borrow().settings.clone();
+
+        let mut children: Vec<Box<dyn Widget>> = vec![
             header_label("Antidote", font.clone(), 36.0),
             body_label(
                 "Hold to grow a bubble. Trap viruses for 3 seconds.",
                 font.clone(),
                 Some(Color::rgba(0.75, 0.82, 0.95, 1.0)),
             ),
-            // Best-score label. `refresh_dynamic_text` rewrites the value
-            // every layout pass.
             body_label(
-                "Best: 0",
+                &format!("Best: {}", settings.best_score),
                 font.clone(),
                 Some(Color::rgba(0.95, 0.85, 0.45, 1.0)),
             ),
-            primary_button("Play", font, move || {
-                let mut m = play_model.borrow_mut();
-                let m = &mut *m;
-                update::start_new_game(&mut m.world, &mut m.physics);
-            }),
         ];
-        Self {
-            bounds: Rect::default(),
-            children,
-            model,
+
+        // Resume button: shown when there's a non-trivial saved session
+        // (anything past the start of level 1 from a freshly-pressed Play).
+        if let Some(saved) = settings
+            .saved_session
+            .as_ref()
+            .filter(|s| s.level > 1 || s.total_score > 0)
+        {
+            let level = saved.level;
+            let total_score = saved.total_score;
+            let lives = saved.lives;
+            let resume_model = self.model.clone();
+            children.push(primary_button(
+                &format!("Resume Level {level} ({total_score})"),
+                font.clone(),
+                move || {
+                    let mut m = resume_model.borrow_mut();
+                    let m = &mut *m;
+                    m.physics = crate::game::physics::PhysicsWorld::new(
+                        crate::consts::VIRTUAL_WIDTH,
+                        crate::consts::VIRTUAL_HEIGHT,
+                    );
+                    m.world = World::new();
+                    m.world.level = level;
+                    m.world.total_score = total_score;
+                    m.world.lives = lives;
+                    crate::game::level::init_level(&mut m.world, &mut m.physics);
+                },
+            ));
         }
+
+        let play_model = self.model.clone();
+        children.push(primary_button("Play", font.clone(), move || {
+            let mut m = play_model.borrow_mut();
+            m.clear_saved_session();
+            let m = &mut *m;
+            update::start_new_game(&mut m.world, &mut m.physics);
+        }));
+
+        // Recent scores. Show up to 5 entries — anything older is in the
+        // settings JSON but doesn't clutter the home screen.
+        if !settings.recent_scores.is_empty() {
+            children.push(body_label(
+                "Recent",
+                font.clone(),
+                Some(Color::rgba(0.65, 0.72, 0.85, 1.0)),
+            ));
+            for entry in settings.recent_scores.iter().take(5) {
+                children.push(body_label(
+                    &format!("Lvl {} — {}", entry.level, entry.score),
+                    font.clone(),
+                    None,
+                ));
+            }
+        }
+
+        self.cache_key = MenuCacheKey {
+            saved: settings
+                .saved_session
+                .as_ref()
+                .map(|s| (s.level, s.total_score, s.lives)),
+            scores_len: settings.recent_scores.len(),
+            best: settings.best_score,
+        };
+        self.children = children;
     }
 
-    /// Update the best-score label to reflect the latest persisted high.
-    fn refresh_dynamic_text(&mut self) {
-        let best = self.model.borrow().best_score;
-        let label = format!("Best: {best}");
-        self.children[2].set_label_text(&label);
+    /// Check the cached key against the current settings; if anything we
+    /// surface in the menu has changed, rebuild. Called from `layout`.
+    fn rebuild_if_stale(&mut self) {
+        let key = {
+            let s = &self.model.borrow().settings;
+            MenuCacheKey {
+                saved: s
+                    .saved_session
+                    .as_ref()
+                    .map(|sn| (sn.level, sn.total_score, sn.lives)),
+                scores_len: s.recent_scores.len(),
+                best: s.best_score,
+            }
+        };
+        if key != self.cache_key {
+            self.rebuild_children();
+        }
     }
 }
 
@@ -198,7 +292,7 @@ impl Widget for MainMenuOverlay {
         self.model.borrow().world.phase == Phase::Start
     }
     fn layout(&mut self, available: Size) -> Size {
-        self.refresh_dynamic_text();
+        self.rebuild_if_stale();
         layout_centered_column(&mut self.children, available.width, available.height);
         available
     }

@@ -22,7 +22,7 @@ pub mod menu_widget;
 pub mod overlay_stack;
 
 use crate::game::state::Phase;
-use crate::platform::{in_memory_best_score_store, BestScoreStore};
+use crate::platform::{in_memory_settings_store, SettingsStore};
 #[cfg(test)]
 use game_model::shared;
 use game_model::{shared_with_store, SharedModel};
@@ -40,17 +40,17 @@ fn load_default_font() -> Arc<Font> {
     Arc::new(Font::from_slice(FONT_BYTES).expect("antidote default font"))
 }
 
-/// Build the shared Antidote application with an in-memory best-score store.
+/// Build the shared Antidote application with an in-memory settings store.
 /// Tests use this; production shells pass a real platform-backed store via
 /// [`build_antidote_app_with_store`].
 pub fn build_antidote_app() -> (App, SharedModel) {
-    build_antidote_app_with_store(in_memory_best_score_store())
+    build_antidote_app_with_store(in_memory_settings_store())
 }
 
-/// Build the shared Antidote application with a caller-supplied best-score
+/// Build the shared Antidote application with a caller-supplied settings
 /// store. Returns `(App, SharedModel)` — shells keep the model handle so
 /// they can drive their own per-frame hooks.
-pub fn build_antidote_app_with_store(store: Arc<dyn BestScoreStore>) -> (App, SharedModel) {
+pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, SharedModel) {
     let model: SharedModel = shared_with_store(store);
     let font = load_default_font();
 
@@ -292,16 +292,68 @@ mod tests {
     }
 
     /// Beating the previous best score must persist via the
-    /// `BestScoreStore` trait so the next session starts with the new high.
+    /// `SettingsStore` trait so the next session starts with the new high.
     #[test]
     fn best_score_persists_when_session_beats_record() {
         let model = shared();
         model.borrow_mut().world.total_score = 500;
         model.borrow_mut().maybe_record_best_score();
-        assert_eq!(model.borrow().best_score, 500);
+        assert_eq!(model.borrow().settings.best_score, 500);
         // Smaller subsequent score must not overwrite.
         model.borrow_mut().world.total_score = 100;
         model.borrow_mut().maybe_record_best_score();
-        assert_eq!(model.borrow().best_score, 500);
+        assert_eq!(model.borrow().settings.best_score, 500);
+    }
+
+    /// `record_finished_session` should append to `recent_scores`,
+    /// drop the oldest entry past the cap, and ignore zero-score
+    /// abandons.
+    #[test]
+    fn recent_scores_capped_and_ordered_most_recent_first() {
+        let model = shared();
+        for n in 1..=10u64 {
+            model
+                .borrow_mut()
+                .record_finished_session(n * 100, n as u32);
+        }
+        let m = model.borrow();
+        // Cap is 8 — first two recordings (100/200) should have fallen off.
+        assert_eq!(m.settings.recent_scores.len(), 8);
+        // Most recent first.
+        assert_eq!(m.settings.recent_scores[0].score, 1000);
+        assert_eq!(m.settings.recent_scores[0].level, 10);
+        // The newest in-range entry that survived is score=300, level=3.
+        assert_eq!(m.settings.recent_scores.last().unwrap().score, 300);
+        // Best score = highest recorded.
+        assert_eq!(m.settings.best_score, 1000);
+        drop(m);
+
+        // Zero-score abandons should not show up.
+        let len_before = model.borrow().settings.recent_scores.len();
+        model.borrow_mut().record_finished_session(0, 1);
+        assert_eq!(model.borrow().settings.recent_scores.len(), len_before);
+    }
+
+    /// `record_saved_session` / `clear_saved_session` round-trip drives
+    /// the Resume button's visibility on the main menu.
+    #[test]
+    fn saved_session_round_trip() {
+        let model = shared();
+        {
+            let mut m = model.borrow_mut();
+            m.world.level = 4;
+            m.world.total_score = 250;
+            m.world.lives = 2;
+            m.record_saved_session();
+        }
+        let snap = model.borrow().settings.saved_session.clone();
+        assert!(snap.is_some());
+        let snap = snap.unwrap();
+        assert_eq!(snap.level, 4);
+        assert_eq!(snap.total_score, 250);
+        assert_eq!(snap.lives, 2);
+
+        model.borrow_mut().clear_saved_session();
+        assert!(model.borrow().settings.saved_session.is_none());
     }
 }

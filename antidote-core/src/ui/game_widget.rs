@@ -6,6 +6,7 @@ use agg_gui::{DrawCtx, Event, EventResult, MouseButton, Point, Rect, Widget};
 use web_time::Instant;
 
 use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
+use crate::game::state::Phase;
 use crate::game::update;
 use crate::render::scene;
 use crate::ui::game_model::SharedModel;
@@ -16,6 +17,11 @@ pub struct GameWidget {
     bounds: Rect,
     children: Vec<Box<dyn Widget>>,
     model: SharedModel,
+    /// `world.phase` from the previous paint pass — used to detect
+    /// transitions exactly once for session persistence (save the resume
+    /// snapshot on entering `LevelComplete`; record the finished session +
+    /// clear the snapshot on entering `GameOver`).
+    last_phase: Option<Phase>,
 }
 
 impl GameWidget {
@@ -24,6 +30,7 @@ impl GameWidget {
             bounds: Rect::new(0.0, 0.0, VIRTUAL_WIDTH as f64, VIRTUAL_HEIGHT as f64),
             children: Vec::new(),
             model,
+            last_phase: None,
         }
     }
 
@@ -129,6 +136,40 @@ impl Widget for GameWidget {
         // Persist a new best score if this tick beat the previous record.
         // Cheap when called every frame — the comparison short-circuits.
         model.maybe_record_best_score();
+
+        // Detect phase transitions for session persistence. Runs at most
+        // once per frame; the comparisons + occasional JSON write are
+        // negligible next to physics + paint.
+        let phase = model.world.phase;
+        let prev = self.last_phase;
+        self.last_phase = Some(phase);
+        if prev != Some(phase) {
+            match phase {
+                // Player just cleared a level. Resume snapshot points at
+                // the level they're *about to* play next, with the
+                // current score + lives carried over. Captured here
+                // rather than in `advance_to_next_level` so a player
+                // backing out to the menu also resumes cleanly.
+                Phase::LevelComplete => {
+                    let m = &mut *model;
+                    m.settings.saved_session = Some(crate::platform::SavedSession {
+                        level: m.world.level + 1,
+                        total_score: m.world.total_score,
+                        lives: m.world.lives,
+                    });
+                    m.save_settings();
+                }
+                // Run is over — record the final score in `recent_scores`
+                // and drop the snapshot so the next session starts fresh.
+                Phase::GameOver => {
+                    let score = model.world.total_score;
+                    let level = model.world.level;
+                    model.record_finished_session(score, level);
+                    model.clear_saved_session();
+                }
+                _ => {}
+            }
+        }
 
         let lb = self.letterbox();
         let time_seconds = model.epoch.elapsed().as_secs_f32();
