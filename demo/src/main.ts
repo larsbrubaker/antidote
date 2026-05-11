@@ -18,9 +18,13 @@ async function main() {
 
   // Size the canvas from JS each time the viewport changes — both the CSS
   // box (`canvas.style.{width,height}`) and the backing store
-  // (`canvas.{width,height}`). Prefer `visualViewport` because on mobile
-  // browsers it tracks the *visible* area (URL bar collapsing in/out, IME
-  // open, devtools device emulator) more honestly than `innerWidth/Height`.
+  // (`canvas.{width,height}`). Match Solitaire (the known-working
+  // mobile sibling): read dimensions from
+  // `documentElement.clientWidth/Height` rather than `visualViewport`
+  // or `innerWidth/innerHeight`. `clientWidth/Height` reflect the
+  // actual laid-out viewport; the other two race with the address bar
+  // collapse on Android Chrome and reported 0 on the user's Pixel,
+  // which is what was leaving the canvas blank.
   //
   // No artificial DPR cap — antidote-wasm raises its wgpu surface-dimension
   // limit to the adapter's reported max at init, and WebGL2 in any browser
@@ -31,14 +35,14 @@ async function main() {
   // case.
   const resizeCanvas = () => {
     const dpr = Math.max(0.5, window.devicePixelRatio || 1);
-    const vw = window.visualViewport?.width ?? window.innerWidth;
-    const vh = window.visualViewport?.height ?? window.innerHeight;
-    const cssW = Math.max(1, Math.floor(vw));
-    const cssH = Math.max(1, Math.floor(vh));
-    canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-    canvas.width = Math.max(1, Math.floor(cssW * dpr));
-    canvas.height = Math.max(1, Math.floor(cssH * dpr));
+    const root = document.documentElement;
+    const cssWidth = root.clientWidth;
+    const cssHeight = root.clientHeight;
+    if (cssWidth === 0 || cssHeight === 0) return;
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+    canvas.width = Math.max(1, Math.floor(cssWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(cssHeight * dpr));
     wasm.set_device_pixel_ratio(dpr);
   };
 
@@ -50,68 +54,44 @@ async function main() {
     };
   };
 
-  // First user gesture → request browser fullscreen so the URL bar (and on
-  // Android, the system status / nav bars) collapse and the canvas fills the
-  // whole screen. Requires a user-initiated event by the spec, so it has to
-  // ride on the first pointerdown.
-  //
-  // Target the canvas itself rather than `document.documentElement`: Chrome
-  // Android has shipped versions that quietly reject fullscreening the
-  // <html> element on touch devices but accept it on a concrete child like
-  // the canvas. The canvas is also the element we actually want to fill the
-  // screen, so this is semantically right too.
-  //
-  // Failures surface to `console.warn` so they're visible in remote-debug
-  // when something silently fails on a real device:
-  //  - iOS Safari on iPhone has no Fullscreen API at all; those users can
-  //    "Add to Home Screen" to get the same effect via the existing
-  //    `apple-mobile-web-app-capable` meta tag.
-  //  - Desktop browsers reject if the user previously declined the
-  //    fullscreen prompt; we just leave them with the URL bar visible.
+  // Mobile: on the first tap, ask the browser for fullscreen so the
+  // URL/address bar disappears and the playfield gets the entire
+  // viewport. Required to be called from a user gesture; we hook it
+  // into the canvas pointerdown handler. No-ops if already fullscreen,
+  // or if the device isn't touch-capable, or if requestFullscreen
+  // isn't supported (iOS Safari has its own bag of quirks — there a
+  // separate "Add to Home Screen" launch is the way to remove the URL
+  // bar). Mirrors Solitaire, which is the known-working mobile
+  // sibling: target `document.documentElement` (the canvas-targeted
+  // variant we tried earlier didn't activate on the user's Pixel) and
+  // reset `fullscreenAttempted` on rejection so a future tap can
+  // retry.
   let fullscreenAttempted = false;
-  type FullscreenCapable = HTMLElement & {
-    webkitRequestFullscreen?: (options?: FullscreenOptions) => Promise<void> | void;
-  };
-  const tryFullscreen = () => {
+  const maybeRequestFullscreen = () => {
     if (fullscreenAttempted) return;
+    if (document.fullscreenElement) {
+      fullscreenAttempted = true;
+      return;
+    }
+    const isTouch =
+      (navigator.maxTouchPoints ?? 0) > 0 || "ontouchstart" in window;
+    if (!isTouch) return;
     fullscreenAttempted = true;
-    if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
-      return;
-    }
-    const target = canvas as FullscreenCapable;
-    const req = target.requestFullscreen?.bind(target)
-      ?? target.webkitRequestFullscreen?.bind(target);
-    if (!req) {
-      console.warn("antidote: Fullscreen API not available on this browser");
-      return;
-    }
-    // ONE synchronous call per user gesture — the second call wouldn't
-    // count as user-activated and would be rejected anyway. Try with the
-    // `navigationUI: "hide"` option (Android Chrome respects it to also
-    // hide the system nav bar); if the call throws synchronously because
-    // the options form isn't supported, fall back to the no-arg form
-    // immediately so user activation is preserved.
-    let promise: Promise<void> | void;
-    try {
-      promise = req({ navigationUI: "hide" });
-    } catch (_err) {
-      try {
-        promise = req();
-      } catch (err) {
-        console.warn("antidote: requestFullscreen threw:", err);
-        return;
-      }
-    }
-    if (promise && typeof (promise as Promise<void>).catch === "function") {
-      (promise as Promise<void>).catch((err) => {
-        console.warn("antidote: fullscreen rejected:", err);
-      });
-    }
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    const req = el.requestFullscreen ?? el.webkitRequestFullscreen;
+    if (!req) return;
+    Promise.resolve(req.call(el)).catch(() => {
+      // User denied or browser doesn't allow it on this gesture — let
+      // a future tap try again.
+      fullscreenAttempted = false;
+    });
   };
 
   canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    tryFullscreen();
+    maybeRequestFullscreen();
     canvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event);
     wasm.on_mouse_down(point.x, point.y, event.button);
@@ -156,18 +136,26 @@ async function main() {
     );
   });
 
+  // Drive layout from BOTH the `resize` event (for changes after first
+  // paint) AND a requestAnimationFrame retry loop that runs until the
+  // viewport reports a non-zero size. The retry guards against a race
+  // where wasm finished loading before the host iframe got laid out —
+  // happens reliably in Vite's preview iframe and intermittently on
+  // Android Chrome when the URL bar is mid-collapse. ResizeObserver is
+  // unreliable here (does not fire its initial observation in some
+  // iframe contexts), so we don't depend on it.
   window.addEventListener("resize", resizeCanvas);
-  // `visualViewport` fires its own resize when the mobile URL bar slides in
-  // or out — handle it so the backing store grows into the reclaimed space
-  // without waiting for the next orientation change.
-  window.visualViewport?.addEventListener("resize", resizeCanvas);
-  window.addEventListener("orientationchange", resizeCanvas);
-  // Entering and exiting fullscreen also changes the available viewport;
-  // the visualViewport resize sometimes fires before the new dimensions
-  // settle, so explicitly re-sync on transition.
   document.addEventListener("fullscreenchange", resizeCanvas);
   document.addEventListener("webkitfullscreenchange", resizeCanvas);
-  resizeCanvas();
+  const tryInitialSize = () => {
+    const root = document.documentElement;
+    if (root.clientWidth > 0 && root.clientHeight > 0) {
+      resizeCanvas();
+      return;
+    }
+    requestAnimationFrame(tryInitialSize);
+  };
+  tryInitialSize();
 
   let last = performance.now();
   const frame = (now: number) => {
