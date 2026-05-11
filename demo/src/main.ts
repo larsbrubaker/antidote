@@ -53,49 +53,59 @@ async function main() {
   // First user gesture → request browser fullscreen so the URL bar (and on
   // Android, the system status / nav bars) collapse and the canvas fills the
   // whole screen. Requires a user-initiated event by the spec, so it has to
-  // ride on the first pointerdown. Failures are fully swallowed:
-  //  - Desktop browsers reject if the user previously declined; we just leave
-  //    them with the URL bar visible.
+  // ride on the first pointerdown.
+  //
+  // Target the canvas itself rather than `document.documentElement`: Chrome
+  // Android has shipped versions that quietly reject fullscreening the
+  // <html> element on touch devices but accept it on a concrete child like
+  // the canvas. The canvas is also the element we actually want to fill the
+  // screen, so this is semantically right too.
+  //
+  // Failures surface to `console.warn` so they're visible in remote-debug
+  // when something silently fails on a real device:
   //  - iOS Safari on iPhone has no Fullscreen API at all; those users can
   //    "Add to Home Screen" to get the same effect via the existing
   //    `apple-mobile-web-app-capable` meta tag.
+  //  - Desktop browsers reject if the user previously declined the
+  //    fullscreen prompt; we just leave them with the URL bar visible.
   let fullscreenAttempted = false;
+  type FullscreenCapable = HTMLElement & {
+    webkitRequestFullscreen?: (options?: FullscreenOptions) => Promise<void> | void;
+  };
   const tryFullscreen = () => {
     if (fullscreenAttempted) return;
     fullscreenAttempted = true;
-    const docEl = document.documentElement as HTMLElement & {
-      webkitRequestFullscreen?: (options?: FullscreenOptions) => Promise<void> | void;
-    };
     if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
       return;
     }
-    const req =
-      docEl.requestFullscreen?.bind(docEl) ?? docEl.webkitRequestFullscreen?.bind(docEl);
-    if (!req) return;
+    const target = canvas as FullscreenCapable;
+    const req = target.requestFullscreen?.bind(target)
+      ?? target.webkitRequestFullscreen?.bind(target);
+    if (!req) {
+      console.warn("antidote: Fullscreen API not available on this browser");
+      return;
+    }
+    // ONE synchronous call per user gesture — the second call wouldn't
+    // count as user-activated and would be rejected anyway. Try with the
+    // `navigationUI: "hide"` option (Android Chrome respects it to also
+    // hide the system nav bar); if the call throws synchronously because
+    // the options form isn't supported, fall back to the no-arg form
+    // immediately so user activation is preserved.
+    let promise: Promise<void> | void;
     try {
-      const result = req({ navigationUI: "hide" });
-      if (result && typeof (result as Promise<void>).catch === "function") {
-        (result as Promise<void>).catch(() => {
-          // Some browsers reject the options-form even when they have the API.
-          try {
-            const fallback = req();
-            if (fallback && typeof (fallback as Promise<void>).catch === "function") {
-              (fallback as Promise<void>).catch(() => {});
-            }
-          } catch {
-            /* swallow */
-          }
-        });
-      }
-    } catch {
+      promise = req({ navigationUI: "hide" });
+    } catch (_err) {
       try {
-        const fallback = req();
-        if (fallback && typeof (fallback as Promise<void>).catch === "function") {
-          (fallback as Promise<void>).catch(() => {});
-        }
-      } catch {
-        /* swallow */
+        promise = req();
+      } catch (err) {
+        console.warn("antidote: requestFullscreen threw:", err);
+        return;
       }
+    }
+    if (promise && typeof (promise as Promise<void>).catch === "function") {
+      (promise as Promise<void>).catch((err) => {
+        console.warn("antidote: fullscreen rejected:", err);
+      });
     }
   };
 
@@ -152,6 +162,11 @@ async function main() {
   // without waiting for the next orientation change.
   window.visualViewport?.addEventListener("resize", resizeCanvas);
   window.addEventListener("orientationchange", resizeCanvas);
+  // Entering and exiting fullscreen also changes the available viewport;
+  // the visualViewport resize sometimes fires before the new dimensions
+  // settle, so explicitly re-sync on transition.
+  document.addEventListener("fullscreenchange", resizeCanvas);
+  document.addEventListener("webkitfullscreenchange", resizeCanvas);
   resizeCanvas();
 
   let last = performance.now();
