@@ -11,27 +11,27 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Antidote</title>
     <style>
-      /* `dvh`/`dvw` track the *visible* viewport, so when mobile Safari /
-         Chrome auto-hide the URL bar on scroll the canvas grows into the
-         reclaimed space. `100vh` would lock to the larger value and leave
-         the bottom of the playfield cut off until the user scrolled. */
+      /* Page locked to the layout viewport — no scrolling, no rubber-banding.
+         The canvas inside is sized explicitly from JS each frame, so the page
+         CSS deliberately does NOT size the canvas with `dvh`/`dvw`. Reason:
+         in Chrome DevTools' device emulator and on some Android browsers,
+         `100dvw` reads the *outer* browser window rather than the emulated /
+         visible viewport, so the canvas ends up wider than what the user can
+         see and everything shifts off-screen to the right. JS-driven sizing
+         via `visualViewport` matches what the user actually sees. */
       html, body {
         margin: 0;
         padding: 0;
-        width: 100dvw;
-        height: 100dvh;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
         background: #000;
         overscroll-behavior: none;
       }
-      /* Canvas pinned to the visible viewport. The 4:3 playfield letterboxes
-         inside (centred) via GameWidget so we don't squash the game when
-         the screen aspect doesn't match. */
       #antidote-canvas {
         position: fixed;
-        inset: 0;
-        width: 100dvw;
-        height: 100dvh;
+        top: 0;
+        left: 0;
         display: block;
         touch-action: none;
         background: #000;

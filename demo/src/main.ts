@@ -16,18 +16,23 @@ async function main() {
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
 
-  // CSS pins the canvas to 100dvw × 100dvh — JS just keeps the backing-store
-  // (canvas.width / canvas.height) sized to match the rendered rect × DPR.
-  // The 4:3 letterbox happens inside the canvas via GameWidget, so on phones
-  // the canvas can fill the full visible viewport and the URL bar still
-  // collapses on first scroll/tap.
+  // Size the canvas from JS each time the viewport changes — both the CSS
+  // box (`canvas.style.{width,height}`) and the backing store
+  // (`canvas.{width,height}`). Prefer `visualViewport` because on mobile
+  // browsers it tracks the *visible* area (URL bar collapsing in/out, IME
+  // open, devtools device emulator) more honestly than `innerWidth/Height`
+  // — and it's what we want the canvas to fill so the 4:3 playfield
+  // letterboxed inside is as large as possible.
   const resizeCanvas = () => {
     const dpr = Math.max(0.5, window.devicePixelRatio || 1);
-    const rect = canvas.getBoundingClientRect();
-    const cssWidth = Math.max(1, Math.floor(rect.width));
-    const cssHeight = Math.max(1, Math.floor(rect.height));
-    canvas.width = Math.max(1, Math.floor(cssWidth * dpr));
-    canvas.height = Math.max(1, Math.floor(cssHeight * dpr));
+    const vw = window.visualViewport?.width ?? window.innerWidth;
+    const vh = window.visualViewport?.height ?? window.innerHeight;
+    const cssW = Math.max(1, Math.floor(vw));
+    const cssH = Math.max(1, Math.floor(vh));
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+    canvas.width = Math.max(1, Math.floor(cssW * dpr));
+    canvas.height = Math.max(1, Math.floor(cssH * dpr));
     wasm.set_device_pixel_ratio(dpr);
   };
 
