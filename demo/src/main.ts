@@ -50,8 +50,58 @@ async function main() {
     };
   };
 
+  // First user gesture → request browser fullscreen so the URL bar (and on
+  // Android, the system status / nav bars) collapse and the canvas fills the
+  // whole screen. Requires a user-initiated event by the spec, so it has to
+  // ride on the first pointerdown. Failures are fully swallowed:
+  //  - Desktop browsers reject if the user previously declined; we just leave
+  //    them with the URL bar visible.
+  //  - iOS Safari on iPhone has no Fullscreen API at all; those users can
+  //    "Add to Home Screen" to get the same effect via the existing
+  //    `apple-mobile-web-app-capable` meta tag.
+  let fullscreenAttempted = false;
+  const tryFullscreen = () => {
+    if (fullscreenAttempted) return;
+    fullscreenAttempted = true;
+    const docEl = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: (options?: FullscreenOptions) => Promise<void> | void;
+    };
+    if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+      return;
+    }
+    const req =
+      docEl.requestFullscreen?.bind(docEl) ?? docEl.webkitRequestFullscreen?.bind(docEl);
+    if (!req) return;
+    try {
+      const result = req({ navigationUI: "hide" });
+      if (result && typeof (result as Promise<void>).catch === "function") {
+        (result as Promise<void>).catch(() => {
+          // Some browsers reject the options-form even when they have the API.
+          try {
+            const fallback = req();
+            if (fallback && typeof (fallback as Promise<void>).catch === "function") {
+              (fallback as Promise<void>).catch(() => {});
+            }
+          } catch {
+            /* swallow */
+          }
+        });
+      }
+    } catch {
+      try {
+        const fallback = req();
+        if (fallback && typeof (fallback as Promise<void>).catch === "function") {
+          (fallback as Promise<void>).catch(() => {});
+        }
+      } catch {
+        /* swallow */
+      }
+    }
+  };
+
   canvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    tryFullscreen();
     canvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event);
     wasm.on_mouse_down(point.x, point.y, event.button);
