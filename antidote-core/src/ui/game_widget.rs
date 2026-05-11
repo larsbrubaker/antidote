@@ -9,7 +9,7 @@ use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::update;
 use crate::render::scene;
 use crate::ui::game_model::SharedModel;
-use crate::ui::hud_widget::HUD_HEIGHT;
+use crate::ui::hud_widget::{playfield_rect, HudLayout};
 use agg_gui::timestep::FIXED_DT;
 
 pub struct GameWidget {
@@ -27,27 +27,33 @@ impl GameWidget {
         }
     }
 
-    /// Compute a centered letterbox into the area BELOW the HUD bar so the top
-    /// strip of the screen reads as chrome, not playfield.
+    /// Centered 4:3 letterbox inside the slab the HUD didn't claim. Which side
+    /// the HUD claims (top vs. left) is decided by `HudLayout::for_available`
+    /// so both widgets agree on the split each frame.
     fn letterbox(&self) -> Letterbox {
-        let w = self.bounds.width as f32;
-        let h_full = self.bounds.height as f32;
-        let hud = HUD_HEIGHT as f32;
-        let h_play = (h_full - hud).max(0.0);
+        let w = self.bounds.width;
+        let h = self.bounds.height;
+        let layout = HudLayout::for_available(w, h);
+        let play = playfield_rect(layout, w, h);
+        let play_w = play.width as f32;
+        let play_h = play.height as f32;
         let target = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
-        let widget_aspect = if h_play > 0.0 { w / h_play } else { target };
-        let scale = if widget_aspect >= target {
-            h_play / VIRTUAL_HEIGHT
+        let widget_aspect = if play_h > 0.0 {
+            play_w / play_h
         } else {
-            w / VIRTUAL_WIDTH
+            target
+        };
+        let scale = if widget_aspect >= target {
+            play_h / VIRTUAL_HEIGHT
+        } else {
+            play_w / VIRTUAL_WIDTH
         };
         let game_w = VIRTUAL_WIDTH * scale;
         let game_h = VIRTUAL_HEIGHT * scale;
         Letterbox {
             scale,
-            offset_x: (w - game_w) * 0.5,
-            // Y-up: subtract HUD strip from the top of the available area.
-            offset_y: (h_play - game_h) * 0.5,
+            offset_x: play.x as f32 + (play_w - game_w) * 0.5,
+            offset_y: play.y as f32 + (play_h - game_h) * 0.5,
             game_h,
         }
     }

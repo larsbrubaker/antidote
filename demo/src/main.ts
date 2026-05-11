@@ -16,18 +16,16 @@ async function main() {
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
 
+  // CSS pins the canvas to 100dvw × 100dvh — JS just keeps the backing-store
+  // (canvas.width / canvas.height) sized to match the rendered rect × DPR.
+  // The 4:3 letterbox happens inside the canvas via GameWidget, so on phones
+  // the canvas can fill the full visible viewport and the URL bar still
+  // collapses on first scroll/tap.
   const resizeCanvas = () => {
     const dpr = Math.max(0.5, window.devicePixelRatio || 1);
-    const maxWidth = window.innerWidth;
-    const maxHeight = window.innerHeight;
-    const aspect = 800 / 600;
-    const cssWidth = Math.floor(
-      maxWidth / aspect <= maxHeight ? maxWidth : maxHeight * aspect,
-    );
-    const cssHeight = Math.floor(cssWidth / aspect);
-
-    canvas.style.width = `${cssWidth}px`;
-    canvas.style.height = `${cssHeight}px`;
+    const rect = canvas.getBoundingClientRect();
+    const cssWidth = Math.max(1, Math.floor(rect.width));
+    const cssHeight = Math.max(1, Math.floor(rect.height));
     canvas.width = Math.max(1, Math.floor(cssWidth * dpr));
     canvas.height = Math.max(1, Math.floor(cssHeight * dpr));
     wasm.set_device_pixel_ratio(dpr);
@@ -88,6 +86,11 @@ async function main() {
   });
 
   window.addEventListener("resize", resizeCanvas);
+  // `visualViewport` fires its own resize when the mobile URL bar slides in
+  // or out — handle it so the backing store grows into the reclaimed space
+  // without waiting for the next orientation change.
+  window.visualViewport?.addEventListener("resize", resizeCanvas);
+  window.addEventListener("orientationchange", resizeCanvas);
   resizeCanvas();
 
   let last = performance.now();

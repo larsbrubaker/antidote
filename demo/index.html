@@ -2,16 +2,44 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Antidote</title>
     <style>
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-      body { display: flex; align-items: center; justify-content: center; }
-      canvas { display: block; touch-action: none; }
+      /* `dvh`/`dvw` track the *visible* viewport, so when mobile Safari /
+         Chrome auto-hide the URL bar on scroll the canvas grows into the
+         reclaimed space. `100vh` would lock to the larger value and leave
+         the bottom of the playfield cut off until the user scrolled. */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100dvw;
+        height: 100dvh;
+        overflow: hidden;
+        background: #000;
+        overscroll-behavior: none;
+      }
+      /* Canvas pinned to the visible viewport. The 4:3 playfield letterboxes
+         inside (centred) via GameWidget so we don't squash the game when
+         the screen aspect doesn't match. */
+      #antidote-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100dvw;
+        height: 100dvh;
+        display: block;
+        touch-action: none;
+        background: #000;
+      }
     </style>
   </head>
   <body>
-    <canvas id="antidote-canvas" width="800" height="600"></canvas>
+    <canvas id="antidote-canvas"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

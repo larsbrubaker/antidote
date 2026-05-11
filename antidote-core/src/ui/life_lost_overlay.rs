@@ -13,7 +13,7 @@ use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::state::Phase;
 use crate::game::update::LIFE_LOST_DURATION;
 use crate::ui::game_model::SharedModel;
-use crate::ui::hud_widget::HUD_HEIGHT;
+use crate::ui::hud_widget::{playfield_rect, HudLayout, HUD_HEIGHT, HUD_WIDTH};
 
 const HEART_RADIUS: f64 = 18.0;
 const FONT_SIZE: f64 = 18.0;
@@ -67,31 +67,44 @@ impl Widget for LifeLostOverlay {
         };
 
         // Letterbox transform — keeps the start anchor lined up with the
-        // exact pixel where the bubble popped. Mirrors GameWidget::letterbox.
-        let w = self.bounds.width as f32;
-        let h = self.bounds.height as f32;
+        // exact pixel where the bubble popped. Mirrors GameWidget::letterbox,
+        // including the HUD-strip carve-out so the "−1" rises from inside
+        // the play area, not from inside the chrome.
+        let w = self.bounds.width;
+        let h = self.bounds.height;
+        let layout = HudLayout::for_available(w, h);
+        let play = playfield_rect(layout, w, h);
+        let play_w = play.width as f32;
+        let play_h = play.height as f32;
         let target = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
-        let widget_aspect = if h > 0.0 { w / h } else { target };
-        let scale = if widget_aspect >= target {
-            h / VIRTUAL_HEIGHT
+        let widget_aspect = if play_h > 0.0 {
+            play_w / play_h
         } else {
-            w / VIRTUAL_WIDTH
+            target
+        };
+        let scale = if widget_aspect >= target {
+            play_h / VIRTUAL_HEIGHT
+        } else {
+            play_w / VIRTUAL_WIDTH
         };
         if scale <= 0.0 {
             return;
         }
         let game_w = VIRTUAL_WIDTH * scale;
         let game_h = VIRTUAL_HEIGHT * scale;
-        let offset_x = (w - game_w) * 0.5;
-        let offset_y = (h - game_h) * 0.5;
+        let offset_x = play.x as f32 + (play_w - game_w) * 0.5;
+        let offset_y = play.y as f32 + (play_h - game_h) * 0.5;
 
         // JS-style logical (Y-down) → widget Y-up pixels.
         let start_x = (offset_x + dx * scale) as f64;
         let start_y = (offset_y + game_h - dy * scale) as f64;
 
-        // End anchor: roughly under the "Lives:" label in the top bar.
-        let end_x = 50.0_f64;
-        let end_y = self.bounds.height - HUD_HEIGHT * 0.5;
+        // End anchor: under the "Lives:" label, wherever the HUD is sitting
+        // this frame.
+        let (end_x, end_y) = match layout {
+            HudLayout::TopStrip => (50.0_f64, h - HUD_HEIGHT * 0.5),
+            HudLayout::LeftStrip => (HUD_WIDTH * 0.5, h - 24.0),
+        };
 
         // Eased upward-floating motion — quadratic ease-out lifts the
         // indicator quickly, then settles into the HUD slot.
