@@ -106,11 +106,18 @@ async fn init_wgpu_async() -> Result<WgpuInit, String> {
         .await
         .map_err(|err| format!("request_adapter: {err:?}"))?;
 
+    // Start from the WebGL2 baseline (max 2048 textures) and raise just the
+    // texture-dimension / buffer-size limits to whatever the adapter actually
+    // supports. Most browsers report 4096 or higher (Pixel + modern desktops
+    // typically 8192–16384), so without this lift the surface configure
+    // panics any time `viewport × DPR` exceeds 2048 on either axis.
+    let adapter_limits = adapter.limits();
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor {
             label: Some("antidote-wasm-wgpu"),
             required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+            required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                .using_resolution(adapter_limits),
             memory_hints: wgpu::MemoryHints::Performance,
             experimental_features: wgpu::ExperimentalFeatures::default(),
             trace: wgpu::Trace::Off,

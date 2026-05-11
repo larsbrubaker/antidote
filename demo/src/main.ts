@@ -16,37 +16,29 @@ async function main() {
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
 
-  // antidote-wasm asks wgpu for the WebGL2 downlevel-baseline limits, which
-  // cap surface (and texture) dimensions at 2048 in each axis. On a Pixel in
-  // landscape (~700 × 422 CSS) × DPR 3 = 2100 × 1266 — `Surface::configure`
-  // panics with a "max extent 2048" validation error and the renderer never
-  // produces a frame, which is why the screen stayed black. Cap the effective
-  // DPR so the larger axis lands at most at this value.
-  const MAX_SURFACE_DIM = 2048;
-
   // Size the canvas from JS each time the viewport changes — both the CSS
   // box (`canvas.style.{width,height}`) and the backing store
   // (`canvas.{width,height}`). Prefer `visualViewport` because on mobile
   // browsers it tracks the *visible* area (URL bar collapsing in/out, IME
   // open, devtools device emulator) more honestly than `innerWidth/Height`.
+  //
+  // No artificial DPR cap — antidote-wasm raises its wgpu surface-dimension
+  // limit to the adapter's reported max at init, and WebGL2 in any browser
+  // we care about reports at least 4096 (Pixel + modern desktops are usually
+  // 8192–16384). If a future device truly only supports 2048, the resulting
+  // wgpu surface-configure error will at least be specific enough to surface
+  // that here — better than silently downscaling for every device just in
+  // case.
   const resizeCanvas = () => {
-    const rawDpr = Math.max(0.5, window.devicePixelRatio || 1);
+    const dpr = Math.max(0.5, window.devicePixelRatio || 1);
     const vw = window.visualViewport?.width ?? window.innerWidth;
     const vh = window.visualViewport?.height ?? window.innerHeight;
     const cssW = Math.max(1, Math.floor(vw));
     const cssH = Math.max(1, Math.floor(vh));
-    // Pull DPR down if the resulting buffer would exceed the surface cap.
-    // CSS dimensions stay unchanged; the browser scales the (slightly
-    // smaller) bitmap to fill them. The same effective DPR goes to
-    // `set_device_pixel_ratio` so agg-gui's widget scaling stays in sync
-    // with what we actually rendered.
-    const maxAxis = Math.max(cssW, cssH) * rawDpr;
-    const dpr =
-      maxAxis > MAX_SURFACE_DIM ? rawDpr * (MAX_SURFACE_DIM / maxAxis) : rawDpr;
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
-    canvas.width = Math.max(1, Math.min(MAX_SURFACE_DIM, Math.floor(cssW * dpr)));
-    canvas.height = Math.max(1, Math.min(MAX_SURFACE_DIM, Math.floor(cssH * dpr)));
+    canvas.width = Math.max(1, Math.floor(cssW * dpr));
+    canvas.height = Math.max(1, Math.floor(cssH * dpr));
     wasm.set_device_pixel_ratio(dpr);
   };
 
