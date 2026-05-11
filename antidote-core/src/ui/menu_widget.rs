@@ -19,7 +19,7 @@ use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
 use crate::game::state::{Phase, World};
 use crate::game::update;
-use crate::ui::game_model::SharedModel;
+use crate::ui::game_model::{MenuView, SharedModel};
 
 /// Width of the centered column that holds the menu widgets.
 pub const COL_W: f64 = 360.0;
@@ -289,7 +289,8 @@ impl Widget for MainMenuOverlay {
         &mut self.children
     }
     fn is_visible(&self) -> bool {
-        self.model.borrow().world.phase == Phase::Start
+        let m = self.model.borrow();
+        m.world.phase == Phase::Start && m.menu_view == MenuView::Main
     }
     fn layout(&mut self, available: Size) -> Size {
         self.rebuild_if_stale();

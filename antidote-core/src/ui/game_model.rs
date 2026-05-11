@@ -25,6 +25,16 @@ use crate::game::state::World;
 use crate::platform::{in_memory_settings_store, SavedSession, Settings, SettingsStore};
 use agg_gui::timestep::FixedTimestep;
 
+/// Which sub-screen of the start-phase main menu is showing. Drives which
+/// overlay paints when `world.phase == Phase::Start`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MenuView {
+    #[default]
+    Main,
+    File,
+    Help,
+}
+
 /// Owning state for the running game. Held inside [`SharedModel`].
 pub struct GameModel {
     pub world: World,
@@ -41,6 +51,18 @@ pub struct GameModel {
     /// level / runs out of lives, or starts a fresh game.
     pub settings: Settings,
     settings_store: Arc<dyn SettingsStore>,
+    /// Which sub-screen of the start menu is showing. `Main` is the default
+    /// Play / Resume / Recent scores view; `File` and `Help` are the
+    /// dropdown-overlays reached from the top menu bar.
+    pub menu_view: MenuView,
+    /// Set to `true` by the File → Export… menu item. The platform shell
+    /// drains this each frame; on web it triggers a `Blob` download of the
+    /// JSON returned by `export_settings_json`. Cleared by the drain.
+    pub pending_export: bool,
+    /// Set to `true` by the File → Import… menu item. The platform shell
+    /// drains this each frame and opens a file picker; the selected file's
+    /// JSON is fed back into `apply_settings_json`.
+    pub pending_import: bool,
 }
 
 impl GameModel {
@@ -54,6 +76,30 @@ impl GameModel {
             timestep: FixedTimestep::new(),
             settings,
             settings_store,
+            menu_view: MenuView::Main,
+            pending_export: false,
+            pending_import: false,
+        }
+    }
+
+    /// Serialize the current `Settings` to a pretty JSON string. Used by
+    /// the File → Export… flow; the platform shell wraps the result in a
+    /// download.
+    pub fn export_settings_json(&self) -> String {
+        serde_json::to_string_pretty(&self.settings).unwrap_or_else(|_| "{}".to_owned())
+    }
+
+    /// Replace the current `Settings` with one parsed from `json` and
+    /// persist. Returns `false` on parse failure; in that case nothing is
+    /// touched so the player can retry with a different file.
+    pub fn apply_settings_json(&mut self, json: &str) -> bool {
+        match serde_json::from_str::<Settings>(json) {
+            Ok(s) => {
+                self.settings = s;
+                self.save_settings();
+                true
+            }
+            Err(_) => false,
         }
     }
 

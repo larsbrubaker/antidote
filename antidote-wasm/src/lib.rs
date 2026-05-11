@@ -30,7 +30,7 @@ use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use agg_gui::{App, Key, Modifiers, MouseButton};
-use antidote_core::ui::build_antidote_app_with_store;
+use antidote_core::ui::{build_antidote_app_with_store, game_model::SharedModel};
 use demo_wgpu::{begin_frame, WgpuGfxCtx};
 use platform::LocalStorageSettingsStore;
 use wasm_bindgen::prelude::*;
@@ -38,6 +38,11 @@ use wasm_bindgen::JsCast;
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
+    /// Top-level handle to the shared GameModel — needed by the export/import
+    /// bindings that have to read/write `settings` outside the widget tree.
+    /// The widgets each hold their own clone, so this is a cheap extra
+    /// reference (single `Rc<RefCell<…>>` clone).
+    static MODEL: RefCell<Option<SharedModel>> = const { RefCell::new(None) };
     static WGPU_INIT: RefCell<Option<WgpuInit>> = const { RefCell::new(None) };
     static WGPU_CTX: RefCell<Option<WgpuGfxCtx>> = const { RefCell::new(None) };
     static NEEDS_DRAW: Cell<bool> = const { Cell::new(true) };
@@ -159,12 +164,61 @@ fn ensure_app() {
         if cell.borrow().is_some() {
             return;
         }
-        // The widget tree owns clones of the SharedModel internally, so we
-        // can drop our handle here — there's no longer any out-of-tree
-        // consumer that needs it.
-        let (app, _model) = build_antidote_app_with_store(LocalStorageSettingsStore::into_shared());
+        let (app, model) = build_antidote_app_with_store(LocalStorageSettingsStore::into_shared());
         *cell.borrow_mut() = Some(app);
+        MODEL.with(|m| *m.borrow_mut() = Some(model));
     });
+}
+
+/// Cheap clone of the shared model handle for use inside the export/import
+/// bindings. Pulls the `Rc<RefCell<…>>` out of the `MODEL` thread_local so
+/// we don't tangle nested `Ref` borrows with `borrow_mut()` on the inner
+/// cell — that confuses the borrow checker on the wasm32 target.
+fn shared_model_clone() -> Option<SharedModel> {
+    MODEL.with(|cell| cell.borrow().clone())
+}
+
+/// Called by the JS shell each frame. If the File → Export menu set
+/// `model.pending_export`, returns the JSON to download (and clears the
+/// flag); otherwise returns `null`. The JS side wraps the string in a Blob
+/// and offers it as `antidote-save.json`.
+#[wasm_bindgen]
+pub fn drain_pending_export() -> Option<String> {
+    let model = shared_model_clone()?;
+    let mut m = model.borrow_mut();
+    if !m.pending_export {
+        return None;
+    }
+    m.pending_export = false;
+    Some(m.export_settings_json())
+}
+
+/// Called by the JS shell each frame. If the File → Import menu set
+/// `model.pending_import`, returns `true` exactly once so the JS side
+/// opens a file picker on the user-gesture frame the click happened on.
+#[wasm_bindgen]
+pub fn drain_pending_import() -> bool {
+    let Some(model) = shared_model_clone() else {
+        return false;
+    };
+    let mut m = model.borrow_mut();
+    if !m.pending_import {
+        return false;
+    }
+    m.pending_import = false;
+    true
+}
+
+/// Replace the local settings with the JSON the JS side read from the
+/// imported file. Returns `false` on parse failure so the shell can
+/// surface an error.
+#[wasm_bindgen]
+pub fn apply_settings_json(json: String) -> bool {
+    let Some(model) = shared_model_clone() else {
+        return false;
+    };
+    let mut m = model.borrow_mut();
+    m.apply_settings_json(&json)
 }
 
 fn ensure_wgpu_ctx(width: f32, height: f32) {

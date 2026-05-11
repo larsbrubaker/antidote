@@ -14,21 +14,27 @@ use std::sync::Arc;
 use agg_gui::text::Font;
 use agg_gui::{App, Key};
 
+pub mod file_overlay;
 pub mod game_model;
 pub mod game_widget;
+pub mod help_overlay;
 pub mod hud_widget;
 pub mod life_lost_overlay;
+pub mod menu_bar;
 pub mod menu_widget;
 pub mod overlay_stack;
 
 use crate::game::state::Phase;
 use crate::platform::{in_memory_settings_store, SettingsStore};
+use file_overlay::FileOverlay;
 #[cfg(test)]
 use game_model::shared;
 use game_model::{shared_with_store, SharedModel};
 use game_widget::GameWidget;
+use help_overlay::HelpOverlay;
 use hud_widget::HudWidget;
 use life_lost_overlay::LifeLostOverlay;
+use menu_bar::MenuBar;
 use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseOverlay};
 use overlay_stack::OverlayStack;
 
@@ -57,6 +63,9 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
     let game_canvas = GameWidget::new(model.clone());
     let hud = HudWidget::new(model.clone(), font.clone());
     let main_menu = MainMenuOverlay::new(model.clone(), font.clone());
+    let menu_bar = MenuBar::new(model.clone(), font.clone());
+    let file_overlay = FileOverlay::new(model.clone(), font.clone());
+    let help_overlay = HelpOverlay::new(model.clone(), font.clone());
     let life_lost = LifeLostOverlay::new(model.clone(), font.clone());
     let level_complete = LevelCompleteOverlay::new(model.clone(), font.clone());
     let game_over = GameOverOverlay::new(model.clone(), font.clone());
@@ -65,12 +74,17 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
     // Z-order matters here: front-to-back in painting, back-to-front in hit
     // testing. Game canvas is at the bottom; pause overlay (which the player
     // can summon at any time) sits on top so its buttons win over any other
-    // overlay when phase happens to coincide.
+    // overlay when phase happens to coincide. The menu bar sits ABOVE the
+    // main-menu overlay so its top-strip buttons receive clicks before the
+    // main-menu backdrop swallows them.
     let root = OverlayStack::new()
         .add(Box::new(game_canvas))
         .add(Box::new(hud))
         .add(Box::new(life_lost))
         .add(Box::new(main_menu))
+        .add(Box::new(menu_bar))
+        .add(Box::new(file_overlay))
+        .add(Box::new(help_overlay))
         .add(Box::new(level_complete))
         .add(Box::new(game_over))
         .add(Box::new(pause));

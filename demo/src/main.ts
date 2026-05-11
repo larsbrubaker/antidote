@@ -157,6 +157,50 @@ async function main() {
   };
   tryInitialSize();
 
+  // File → Export… in the in-game menu sets `model.pending_export`. Drain
+  // it each frame; when it flips true, fetch the JSON from wasm, wrap in a
+  // Blob, and offer it as `antidote-save.json` via a transient anchor.
+  const drainExport = () => {
+    const json = wasm.drain_pending_export?.();
+    if (typeof json !== "string") return;
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "antidote-save.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // File → Import… sets `model.pending_import`. When drained, open a hidden
+  // file input; the user-gesture context from the menu click carries through
+  // because the wasm `pending_import` flag was set inside the same gesture
+  // and we drain it on the very next animation frame.
+  const drainImport = () => {
+    if (!wasm.drain_pending_import?.()) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.style.display = "none";
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const ok = wasm.apply_settings_json?.(text);
+        if (!ok) console.warn("antidote: import failed to parse JSON");
+      } catch (err) {
+        console.warn("antidote: import read error", err);
+      } finally {
+        document.body.removeChild(input);
+      }
+    });
+    document.body.appendChild(input);
+    input.click();
+  };
+
   let last = performance.now();
   const frame = (now: number) => {
     const frameMs = now - last;
@@ -164,6 +208,8 @@ async function main() {
     if (wasm.needs_draw()) {
       wasm.render(canvas.width, canvas.height, frameMs);
     }
+    drainExport();
+    drainImport();
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
