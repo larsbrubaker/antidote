@@ -7,8 +7,14 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="theme-color" content="#000000" />
+    <!-- The Apple-specific tag is deprecated in favour of the WHATWG-standard
+         `mobile-web-app-capable`; keep the Apple version for older iOS
+         versions that don't yet honour the standard one. -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Suppress the /favicon.ico 404. Real favicon can replace this later. -->
+    <link rel="icon" href="data:," />
     <title>Antidote</title>
     <style>
       /* Page locked to the layout viewport — no scrolling, no rubber-banding.
