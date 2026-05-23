@@ -59,3 +59,7 @@ See [`antidote_todo.md`](antidote_todo.md) for the live punch list.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+Part of the [rust-apps](https://github.com/larsbrubaker/rust-apps) suite — a collection of Rust graphics and geometry libraries by Lars Brubaker.
