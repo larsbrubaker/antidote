@@ -3039,9 +3039,9 @@ dependencies = [
 
 [[package]]
 name = "tess2-rust"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bfd7cd37bd4442708d20a99d527cc9ab8a1cec71793c0a59c903bbb3a5dbae5"
+checksum = "e5997fcbf2135f580b225912c9490c02d3fcf063af579fa4c6f5fe20c9ecb087"
 
 [[package]]
 name = "thiserror"
