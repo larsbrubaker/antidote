@@ -2,6 +2,19 @@
 
 [![Antidote](readme_hero.png)](https://larsbrubaker.github.io/antidote/)
 
+## Support the Project
+
+<a href="https://buymeacoffee.com/larsbrubaker"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"></a>
+
+Antidote is open-source and free to use, maintained in spare time as a labor of love. Friends James Smith and Dan Ruskin help out from time to time too.
+
+If you find it useful, here are a few ways to help keep development going:
+
+- **Donations:** [Buy Me a Coffee](https://buymeacoffee.com/larsbrubaker) — every coffee helps.
+- **Star the repo:** Costs nothing and helps others find the project.
+- **Report issues:** [Open an issue](https://github.com/larsbrubaker/antidote/issues) for bugs or feature ideas.
+- **Contribute:** PRs welcome — open an issue first to discuss larger changes.
+
 [Live Demo](https://larsbrubaker.github.io/antidote/) · [Repository](https://github.com/larsbrubaker/antidote)
 
 Bubble-trap virus puzzle game in Rust — rendered with [agg-gui](https://github.com/larsbrubaker/agg-gui), physics by [rapier2d](https://rapier.rs/). Runs natively (winit + wgpu) and in the browser (WebAssembly).
@@ -55,19 +68,6 @@ No accounts, no network, no syncing across devices.
 | M5 | Local best-score persistence | ✓ |
 
 See [`antidote_todo.md`](antidote_todo.md) for the live punch list.
-
-## Support the Project
-
-<a href="https://buymeacoffee.com/larsbrubaker"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"></a>
-
-Antidote is open-source and free to use, maintained in spare time as a labor of love. Friends James Smith and Dan Ruskin help out from time to time too.
-
-If you find it useful, here are a few ways to help keep development going:
-
-- **Donations:** [Buy Me a Coffee](https://buymeacoffee.com/larsbrubaker) — every coffee helps.
-- **Star the repo:** Costs nothing and helps others find the project.
-- **Report issues:** [Open an issue](https://github.com/larsbrubaker/antidote/issues) for bugs or feature ideas.
-- **Contribute:** PRs welcome — open an issue first to discuss larger changes.
 
 ## License
 
