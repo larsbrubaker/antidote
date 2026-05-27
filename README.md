@@ -1,7 +1,5 @@
 # Antidote
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/larsbrubaker)
-
 [![Antidote](readme_hero.png)](https://larsbrubaker.github.io/antidote/)
 
 [Live Demo](https://larsbrubaker.github.io/antidote/) · [Repository](https://github.com/larsbrubaker/antidote)
@@ -57,6 +55,19 @@ No accounts, no network, no syncing across devices.
 | M5 | Local best-score persistence | ✓ |
 
 See [`antidote_todo.md`](antidote_todo.md) for the live punch list.
+
+## Support the Project
+
+<a href="https://buymeacoffee.com/larsbrubaker"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"></a>
+
+Antidote is open-source and free to use, maintained in spare time as a labor of love.
+
+If you find it useful, here are a few ways to help keep development going:
+
+- **Donations:** [Buy Me a Coffee](https://buymeacoffee.com/larsbrubaker) — every coffee helps.
+- **Star the repo:** Costs nothing and helps others find the project.
+- **Report issues:** [Open an issue](https://github.com/larsbrubaker/antidote/issues) for bugs or feature ideas.
+- **Contribute:** PRs welcome — open an issue first to discuss larger changes.
 
 ## License
 
