@@ -1,7 +1,7 @@
 //! World state. Plain structs; no ECS. Mirrors the JS reference's globals
 //! in `gfg/public/games/antidote/antidote.js`.
 
-use rapier2d::prelude::RigidBodyHandle;
+use box2d_rust::id::BodyId;
 
 use crate::consts::{BASE_ANTIDOTE_TIME, BASE_LIVES};
 
@@ -35,7 +35,7 @@ pub struct Virus {
     pub last_unstuck_y: f32,
     pub stuck_time: f32,
     pub speed: f32,
-    pub body: Option<RigidBodyHandle>,
+    pub body: Option<BodyId>,
 }
 
 /// A virus in the dying-animation transition (alive → dead).
@@ -57,7 +57,7 @@ pub struct Bubble {
     pub radius: f32,
     pub vx: f32,
     pub vy: f32,
-    pub body: Option<RigidBodyHandle>,
+    pub body: Option<BodyId>,
 }
 
 /// A dead virus that sinks downward.
@@ -67,7 +67,7 @@ pub struct DeadVirus {
     pub y: f32,
     pub radius: f32,
     pub vy: f32,
-    pub body: Option<RigidBodyHandle>,
+    pub body: Option<BodyId>,
 }
 
 /// The bubble the player is currently growing.
@@ -81,7 +81,7 @@ pub struct GrowingBubble {
     /// Indices into `World::solid_bubbles` / `World::dead_viruses` that this
     /// bubble was started inside of; used to slide out gradually before growing.
     pub initial_overlaps: Vec<InitialOverlap>,
-    pub body: Option<RigidBodyHandle>,
+    pub body: Option<BodyId>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -123,7 +123,7 @@ pub struct World {
     /// current growing bubble. Mirrors `slideOutCharged` in the JS reference.
     pub slide_out_charged: bool,
     /// Radius at the time of the last `resize_growing_bubble_collider` call.
-    /// Used so we don't tear down + rebuild the rapier collider every frame
+    /// Used so we don't tear down + rebuild the physics shape every frame
     /// for a tiny radius bump.
     pub last_grown_collider_radius: f32,
     /// `total_score` snapshot at the start of the current level. The

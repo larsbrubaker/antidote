@@ -17,20 +17,22 @@ demo-wgpu = { path = "../agg-gui/demo-wgpu", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 web-time = "1"
-rapier2d = "0.22"
+box2d-rust = "1.0"
 
 # ---------------------------------------------------------------------------
-# Local development override — see CLAUDE.md "Local development uses agg-gui
-# as a path dep". The rust-apps superproject lays out agg-gui as a sibling at
-# ../agg-gui/. CI clones it the same way (see .github/workflows/ci.yml +
-# deploy-demo.yml) so this patch resolves both locally and in Actions.
+# Local development overrides — see CLAUDE.md "Local development uses agg-gui
+# as a path dep". The rust-apps superproject lays out agg-gui and box2d-rust
+# as siblings at ../agg-gui/ and ../box2d-rust/. CI clones them the same way
+# (see .github/workflows/ci.yml + deploy-demo.yml) so these patches resolve
+# both locally and in Actions.
 # ---------------------------------------------------------------------------
 [patch.crates-io]
 agg-gui = { path = "../agg-gui/agg-gui" }
+box2d-rust = { path = "../box2d-rust" }
 
 # ---------------------------------------------------------------------------
 # Optimize dependencies in debug builds. The agg-rust software rasterizer +
-# rapier2d are both expensive unoptimized — without this dev frame time drops
+# box2d-rust are both expensive unoptimized — without this dev frame time drops
 # to ~5 fps. Mirrors agg-gui's own workspace profile.
 # ---------------------------------------------------------------------------
 [profile.dev.package."*"]

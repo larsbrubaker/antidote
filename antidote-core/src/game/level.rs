@@ -16,7 +16,7 @@ pub fn virus_speed_for_level(level: u32) -> f32 {
 /// `initLevel()` in the JS reference: clear all entities, set antidote
 /// budget, spawn viruses.
 pub fn init_level(world: &mut World, physics: &mut PhysicsWorld) {
-    // Destroy every rapier body the world references BEFORE wiping the Vecs;
+    // Destroy every physics body the world references BEFORE wiping the Vecs;
     // otherwise the previous level's bubbles, dead viruses, and any
     // in-progress growing bubble would persist as invisible colliders that
     // newly-spawned viruses can pin themselves against (manifests as "virus
@@ -124,7 +124,7 @@ mod tests {
         }
     }
 
-    /// Re-initializing a level must not leak rapier bodies from the previous
+    /// Re-initializing a level must not leak physics bodies from the previous
     /// level. Without the destroy-bodies pass at the top of `init_level`,
     /// each level transition would accumulate ghost colliders that pin newly
     /// spawned viruses ("virus stuck dead-center on level start").
@@ -137,11 +137,11 @@ mod tests {
         world.level = 5;
         init_level(&mut world, &mut physics);
         // Walls (4) + 3 viruses for level 5.
-        let baseline = physics.bodies.len();
+        let baseline = physics.body_count();
         assert_eq!(world.viruses.len(), 3);
         assert_eq!(baseline, 7);
 
-        // Stage a bubble and a dead virus, both with rapier bodies.
+        // Stage a bubble and a dead virus, both with physics bodies.
         let mut bubble = Bubble {
             x: 200.0,
             y: 200.0,
@@ -163,15 +163,15 @@ mod tests {
         physics.spawn_dead_virus_body(&mut dead);
         world.dead_viruses.push(dead);
 
-        assert_eq!(physics.bodies.len(), baseline + 2);
+        assert_eq!(physics.body_count(), baseline + 2);
 
         // Advance to the next level. New viruses spawn fresh; bubble +
         // dead virus from previous level must be destroyed in physics.
         world.level += 1;
         init_level(&mut world, &mut physics);
 
-        let virus_count = virus_count_for_level(world.level) as usize;
+        let virus_count = virus_count_for_level(world.level) as i32;
         // Walls (4) + viruses; nothing else lingers.
-        assert_eq!(physics.bodies.len(), 4 + virus_count);
+        assert_eq!(physics.body_count(), 4 + virus_count);
     }
 }

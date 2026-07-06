@@ -10,14 +10,14 @@
   - **GPU renderers (WGSL shaders, geometry, draw calls)** → `demo-wgpu` / future `agg-gui` wgpu backend
   - **Platform shell (OS window or browser canvas + event forwarding + persistence backend)** → `antidote-native` and `antidote-wasm`
 - Y-up: agg-gui is Y-up first-quadrant; the JS reference is Y-down. The flip happens once at the GameWidget boundary in `antidote_core::render::scene::flip_y` — every helper inside `render::scene` works in JS-style Y-down coordinates.
-- **Physics: rapier2d.** Don't replace it with a hand-rolled integrator. Body parameters (density, friction, restitution, damping, CCD) match `gfg/public/games/antidote/antidote-physics.js` exactly. PIXELS_PER_METER = 30. Box2D/Planck contact mixing matters for gameplay feel: use min friction and max restitution combine rules in Rapier so viruses can bounce off and push solid bubbles instead of losing energy and getting trapped too easily.
+- **Physics: box2d-rust** (Lars's pure-Rust Box2D v3 port, `larsbrubaker/box2d-rust`). Don't replace it with a hand-rolled integrator. Body parameters (density, friction, restitution, damping, bullet-CCD on viruses only) match `gfg/public/games/antidote/antidote-physics.js` exactly. PIXELS_PER_METER = 30, zero-gravity world, `world_step(dt, 4)` sub-steps. Box2D's default contact mixing (friction = sqrt(f1·f2), restitution = max) is exactly what the Planck.js reference used — do not add combine-rule overrides or manual separation passes; the only post-step correction is `clamp_to_playfield`, the safety net behind the "nothing ever leaves the window" promise. Like agg-gui, box2d-rust is path-patched to the sibling checkout at `../box2d-rust/` and CI clones it.
 - **Fixed timestep:** gameplay/physics updates must run through `antidote_core::game::timestep::FixedTimestep` at 60 Hz. Never feed wall-clock frame deltas directly into physics. Slow frames may run up to four fixed updates before drawing (15 fps floor); beyond that, drop accumulated time so collision steps stay bounded.
 - **Rendering: pixel-faithful reproduction of the JS Canvas.** Every gradient stop, alpha, line width, eye offset, spike orbit, wobble, ease curve, and pop-animation timing must match `gfg/public/games/antidote/antidote-rendering.js`. When in doubt, run the JS reference side-by-side and compare frames.
 - **No accounts, no network.** The only persistence is a best-score number saved locally (JSON file on native, `localStorage` in the browser) via the `BestScoreStore` trait in `antidote_core::platform`. There is no Supabase, no auth, no leaderboard backend. If a feature requires a server round trip, it's out of scope.
 
 ## Local development uses agg-gui as a path dep — improve it as you go
 
-When developing on a workstation that has the rust-apps superproject checked out (with the agg-gui submodule beside antidote at `../agg-gui/`), the `[patch.crates-io]` section in the workspace `Cargo.toml` redirects `agg-gui` to the local checkout. **This is the default state** — every commit assumes contributors are running with the path override active.
+When developing on a workstation that has the rust-apps superproject checked out (with the agg-gui submodule beside antidote at `../agg-gui/`, and box2d-rust at `../box2d-rust/`), the `[patch.crates-io]` section in the workspace `Cargo.toml` redirects `agg-gui` and `box2d-rust` to the local checkouts. **This is the default state** — every commit assumes contributors are running with the path overrides active.
 
 That means: when antidote needs an agg-gui feature that doesn't exist yet, the right move is to **add it to agg-gui itself** (in `C:\Development\rust-apps\agg-gui\agg-gui\src\…`), not to work around it inside antidote. agg-gui is being grown specifically to support games well; antidote is one of the first real callers driving that growth.
 
@@ -27,7 +27,7 @@ Workflow:
 3. When the agg-gui changes are stable, publish a new agg-gui version to crates.io (Lars handles this manually).
 4. CI continues building against the published crates.io version because the CI workflow clones `larsbrubaker/agg-gui` as a sibling so the `path = "../agg-gui/agg-gui"` patch resolves there too.
 
-If you're checking out antidote standalone (no rust-apps superproject), clone agg-gui sibling: `git clone https://github.com/larsbrubaker/agg-gui.git ../agg-gui` from this repo's root.
+If you're checking out antidote standalone (no rust-apps superproject), clone the siblings from this repo's root: `git clone https://github.com/larsbrubaker/agg-gui.git ../agg-gui` and `git clone https://github.com/larsbrubaker/box2d-rust.git ../box2d-rust`. The same sibling-improvement workflow applies to box2d-rust: if antidote needs an engine feature or hits an engine bug, fix it in `../box2d-rust/src/…` and Lars publishes to crates.io.
 
 ## Rendering: hardware for game sprites, software for text/menus
 

@@ -46,20 +46,13 @@ pub fn tick(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
     physics.apply_dead_virus_gravity(world, DEAD_VIRUS_SINK_SPEED);
 
     physics.step(dt);
-    // Hard guarantees the user explicitly asked for, applied AFTER rapier's
-    // own velocity solver runs. Both fix slow-drift symptoms that a velocity
-    // solver alone can't:
-    //  - `enforce_no_interpenetration`: no body↔body interpenetration. The
-    //    constant upward float force makes the solver leave a sliver of
-    //    contact-slack penetration each step; over many steps that sliver
-    //    accumulates into a visible "bubble creeping inside another
-    //    bubble" drift. The Gauss-Seidel separation pass projects all
-    //    overlaps out and cancels the closing relative velocity. Internally
-    //    re-clamps to the playfield between sweeps.
-    //  - `clamp_to_playfield` (final): no body crosses the window frame.
-    //    `enforce_no_interpenetration` already calls this between sweeps;
-    //    we call it again here for clarity and as the very last word.
-    physics.enforce_no_interpenetration(world);
+    // Hard guarantee the user explicitly asked for: no body ever crosses the
+    // window frame. Box2D's contact solver handles body↔body resting contact
+    // natively (the old rapier port needed a manual Gauss-Seidel separation
+    // pass here); the playfield clamp stays as a cheap safety net for
+    // extreme-impulse frames where the integrator briefly resolves outside
+    // a wall.
+    physics.clamp_to_playfield(world);
     physics.sync_to_world(world);
 
     let target_speed = virus_speed_for_level(world.level);
@@ -247,8 +240,8 @@ fn grow_bubble(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
         g.y = VIRTUAL_HEIGHT - g.radius;
     }
 
-    // Resize the rapier collider only when the radius has moved meaningfully —
-    // tearing down + recreating a collider every frame is expensive. 0.5 px
+    // Resize the physics shape only when the radius has moved meaningfully —
+    // tearing down + recreating a shape every frame is expensive. 0.5 px
     // is well below the visual difference but still tracks the bubble's
     // collision behaviour with viruses correctly.
     if let Some(h) = g.body {
@@ -405,7 +398,7 @@ fn update_trap_timers(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
 }
 
 /// Advance dying-virus death_progress. Completed ones become dead viruses
-/// (with sink-prone rapier body) plus a pop animation.
+/// (with sink-prone physics body) plus a pop animation.
 fn advance_dying_viruses(world: &mut World, physics: &mut PhysicsWorld, dt: f32) {
     let mut to_remove: Vec<usize> = Vec::new();
     for (i, dv) in world.dying_viruses.iter_mut().enumerate() {
@@ -551,7 +544,7 @@ mod tests {
         level_init(&mut world, &mut physics);
         // Push viruses out of the way of the bubble we're about to grow.
         // The world struct fields alone aren't enough — sync_to_world rewrites
-        // them from the rapier body every tick, so we have to move the body
+        // them from the physics body every tick, so we have to move the body
         // too AND zero its velocity so it doesn't drift back into the bubble.
         for v in world.viruses.iter_mut() {
             v.x = 50.0;

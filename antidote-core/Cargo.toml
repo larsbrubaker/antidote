@@ -13,7 +13,7 @@ agg-gui = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 web-time = { workspace = true }
-rapier2d = { workspace = true }
+box2d-rust = { workspace = true }
 rand = "0.8"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

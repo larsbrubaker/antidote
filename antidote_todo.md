@@ -58,12 +58,12 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 2. **Done — Pull the same wgpu pipeline introduced in Phase 1.** `antidote-wasm` now uses `demo_wgpu::WgpuGfxCtx` with `wgpu` features = `["wgsl", "webgl"]` so it targets WebGL2 instead of requiring WebGPU.
 3. **Done — Wire the TS shell.** `demo/src/main.ts` imports the wasm-pack output, attaches it to `#antidote-canvas`, drives a `requestAnimationFrame` loop that calls into wasm, and forwards pointer events through wasm-bindgen.
 4. **Done — Local TS build path.** `wasm-pack build antidote-wasm --target web --out-dir ../demo/public/pkg --no-typescript` followed by `bun run build` succeeds; `bun run dev` can reuse the most recent wasm-pack output for hot reload of the TS shell.
-5. Verify the deploy artifact size — wgpu + rapier2d + agg-gui together are not small. Aim for under ~5 MB gzipped; if larger, add `wasm-opt` step in CI.
+5. Verify the deploy artifact size — wgpu + box2d-rust + agg-gui together are not small. Aim for under ~5 MB gzipped; if larger, add `wasm-opt` step in CI.
 
 **Risks:**
 
 - WebGPU adoption is uneven; WebGL fallback path needs to ship from day one.
-- rapier2d on wasm may pull a chunk of bundle weight. Consider feature-gating components we don't use.
+- Physics on wasm may pull a chunk of bundle weight (box2d-rust is zero-dependency, which helps). Measure after the swap.
 
 ---
 
@@ -115,7 +115,7 @@ A living checklist of what's left and the order we plan to tackle it. The origin
 Ongoing observation: even with profile-fix in place, frame time creeps from ~25 ms to ~30 ms over 12 s of play. Suspected culprits in priority order:
 
 1. agg-rust internal cache (path / gradient / span generators) growing.
-2. Rapier `QueryPipeline` rebuilding spatial structures every step despite low body count.
+2. ~~Rapier `QueryPipeline` rebuilding spatial structures every step despite low body count.~~ (Obsolete — physics engine replaced with box2d-rust 2026-07-05.)
 3. State stack inside `GfxCtx` accumulating between paints (should be balanced — verify).
 4. softbuffer surface re-config — re-checks size each frame.
 

@@ -120,7 +120,7 @@ pub fn secondary_button(
 }
 
 /// Reset world to a fresh "level 1, full lives, zero score" state without
-/// leaking rapier bodies.
+/// leaking physics bodies.
 fn reset_to_start(model: &SharedModel) {
     let mut m = model.borrow_mut();
     let m = &mut *m;

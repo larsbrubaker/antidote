@@ -17,7 +17,7 @@ If you find it useful, here are a few ways to help keep development going:
 
 [Live Demo](https://larsbrubaker.github.io/antidote/) · [Repository](https://github.com/larsbrubaker/antidote)
 
-Bubble-trap virus puzzle game in Rust — rendered with [agg-gui](https://github.com/larsbrubaker/agg-gui), physics by [rapier2d](https://rapier.rs/). Runs natively (winit + wgpu) and in the browser (WebAssembly).
+Bubble-trap virus puzzle game in Rust — rendered with [agg-gui](https://github.com/larsbrubaker/agg-gui), physics by [box2d-rust](https://github.com/larsbrubaker/box2d-rust) (a pure-Rust Box2D v3 port). Runs natively (winit + wgpu) and in the browser (WebAssembly).
 
 Held pointer grows an antidote bubble; bouncing viruses get trapped if they can't move for 3 seconds; lives, levels, and a best-score record persisted locally per device.
 

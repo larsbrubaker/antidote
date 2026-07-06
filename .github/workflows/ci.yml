@@ -19,6 +19,11 @@ jobs:
       - name: Clone agg-gui sibling
         run: git clone --depth 1 https://github.com/larsbrubaker/agg-gui.git ../agg-gui
 
+      # Sibling box2d-rust checkout — same pattern; [patch.crates-io] points
+      # box2d-rust at `../box2d-rust`. See CLAUDE.md.
+      - name: Clone box2d-rust sibling
+        run: git clone --depth 1 https://github.com/larsbrubaker/box2d-rust.git ../box2d-rust
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

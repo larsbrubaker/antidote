@@ -24,8 +24,8 @@ fn correct_wall_slide_preserves_speed_when_correcting() {
 #[test]
 fn world_creates_with_four_walls() {
     let world = PhysicsWorld::new(800.0, 600.0);
-    assert_eq!(world.bodies.len(), 4);
-    assert_eq!(world.colliders.len(), 4);
+    assert_eq!(world.body_count(), 4);
+    assert_eq!(world.shape_count(), 4);
 }
 
 #[test]
@@ -37,12 +37,12 @@ fn step_runs_without_panic() {
 
 /// Regression: a stack of bubbles under continuous upward float force must
 /// never interpenetrate, even when pinned against the top wall for many
-/// seconds. Mirrors the screenshot Lars sent where one bubble had crept
-/// inside another bubble (and through the playfield's top edge) after the
-/// cluster sat at the top wall under constant upward pressure. The fix is
-/// the post-step `enforce_no_interpenetration` pass; without it, after a
-/// few seconds two adjacent bubbles' centres approach each other by 4+ px
-/// past the sum of radii.
+/// seconds. Mirrors the screenshot Lars sent (from the rapier era) where one
+/// bubble had crept inside another bubble (and through the playfield's top
+/// edge) after the cluster sat at the top wall under constant upward
+/// pressure. Box2D's contact solver resolves resting stacks natively — this
+/// test validates that with no manual separation pass, the cluster stays
+/// separated within contact slop.
 #[test]
 fn stacked_bubbles_under_float_force_dont_interpenetrate() {
     use crate::consts::BUBBLE_FLOAT_SPEED;
@@ -74,7 +74,7 @@ fn stacked_bubbles_under_float_force_dont_interpenetrate() {
     for _ in 0..(8 * 60) {
         phys.apply_bubble_float(&world, BUBBLE_FLOAT_SPEED * 2.0, BUBBLE_FLOAT_SPEED * 1.5);
         phys.step(1.0 / 60.0);
-        phys.enforce_no_interpenetration(&world);
+        phys.clamp_to_playfield(&world);
         phys.sync_to_world(&mut world);
     }
 

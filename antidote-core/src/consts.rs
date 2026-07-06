@@ -32,7 +32,7 @@ pub const ANTIDOTE_DRAIN_RATE: f32 = 0.5;
 pub const WALL_PROXIMITY_THRESHOLD: f32 = 20.0;
 pub const MIN_PERPENDICULAR_RATIO: f32 = 0.3;
 
-// Physics scaling — Box2D/Rapier work best with object sizes in 0.1..10 m.
+// Physics scaling — Box2D works best with object sizes in 0.1..10 m.
 pub const PIXELS_PER_METER: f32 = 30.0;
 
 #[inline]
