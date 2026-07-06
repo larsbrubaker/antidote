@@ -16,6 +16,15 @@ async function main() {
   const wasm = await import(/* @vite-ignore */ wasmJsUrl);
   await wasm.default(wasmBgUrl);
 
+  // Tell the core UI whether this is a mobile/touch device. A coarse primary
+  // pointer means phone/tablet — touch-capable laptops report a fine pointer
+  // and stay in desktop mode. Drives the rotate-to-landscape overlay and
+  // enter-fullscreen-on-Play inside antidote-core.
+  const coarseQuery = window.matchMedia("(pointer: coarse)");
+  const applyEnvironment = () => wasm.set_environment?.(coarseQuery.matches);
+  applyEnvironment();
+  coarseQuery.addEventListener?.("change", applyEnvironment);
+
   // Size the canvas from JS each time the viewport changes — both the CSS
   // box (`canvas.style.{width,height}`) and the backing store
   // (`canvas.{width,height}`). Match Solitaire (the known-working
@@ -54,20 +63,50 @@ async function main() {
     };
   };
 
+  // Best-effort landscape lock. Only works inside fullscreen on Android
+  // Chrome; iOS Safari has no `orientation.lock` at all — there the core
+  // UI's rotate-device overlay is the fallback. Rejections are expected
+  // (desktop, device rotation-lock on, iOS) and swallowed.
+  const lockLandscape = () => {
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (o: string) => Promise<void>;
+    };
+    orientation?.lock?.("landscape").catch(() => {});
+  };
+
+  const isFullscreen = () => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+    };
+    return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+  };
+
+  const requestFullscreen = () => {
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    const req = el.requestFullscreen ?? el.webkitRequestFullscreen;
+    if (!req) {
+      return Promise.reject(new Error("Fullscreen API not available"));
+    }
+    return Promise.resolve(req.call(el));
+  };
+
   // Fullscreen is no longer auto-triggered on the first tap — the unsolicited
   // chrome-collapse was jarring. Instead, the menu bar's Fullscreen button
   // sets `model.pending_fullscreen_toggle`; we drain that flag and toggle
   // here. Browser fullscreen state is the source of truth on the JS side, so
   // the same button enters or exits depending on `document.fullscreenElement`.
   const toggleFullscreen = () => {
-    const el = document.documentElement as HTMLElement & {
-      webkitRequestFullscreen?: () => Promise<void>;
-    };
     const doc = document as Document & {
-      webkitFullscreenElement?: Element | null;
       webkitExitFullscreen?: () => Promise<void>;
     };
-    if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+    if (isFullscreen()) {
+      try {
+        (screen.orientation as ScreenOrientation & { unlock?: () => void })?.unlock?.();
+      } catch {
+        // Some browsers throw if nothing was locked — irrelevant.
+      }
       const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen;
       if (exit) {
         Promise.resolve(exit.call(doc)).catch((err) => {
@@ -76,14 +115,13 @@ async function main() {
       }
       return;
     }
-    const req = el.requestFullscreen ?? el.webkitRequestFullscreen;
-    if (!req) {
-      console.warn("antidote: Fullscreen API not available on this browser");
-      return;
-    }
-    Promise.resolve(req.call(el)).catch((err) => {
-      console.warn("antidote: requestFullscreen rejected:", err);
-    });
+    requestFullscreen()
+      .then(() => {
+        if (coarseQuery.matches) lockLandscape();
+      })
+      .catch((err) => {
+        console.warn("antidote: requestFullscreen rejected:", err);
+      });
   };
 
   canvas.addEventListener("pointerdown", (event) => {
@@ -143,6 +181,10 @@ async function main() {
   window.addEventListener("resize", resizeCanvas);
   document.addEventListener("fullscreenchange", resizeCanvas);
   document.addEventListener("webkitfullscreenchange", resizeCanvas);
+  // Rotation also fires `resize`, but Android Chrome sometimes reports stale
+  // dimensions during the URL-bar collapse; a second trigger off the
+  // orientation event is cheap insurance.
+  screen.orientation?.addEventListener?.("change", resizeCanvas);
   const tryInitialSize = () => {
     const root = document.documentElement;
     if (root.clientWidth > 0 && root.clientHeight > 0) {
@@ -177,6 +219,22 @@ async function main() {
   const drainFullscreenToggle = () => {
     if (!wasm.drain_pending_fullscreen_toggle?.()) return;
     toggleFullscreen();
+  };
+
+  // Starting/resuming a game on mobile sets `model.pending_enter_fullscreen`.
+  // Enter-only: never exits. Chrome requires fullscreen before
+  // `orientation.lock` resolves, so chain the lock after the request; if the
+  // request is rejected (already-fullscreen PWA, iOS), still try the lock —
+  // it's harmless when unsupported.
+  const drainEnterFullscreen = () => {
+    if (!wasm.drain_pending_enter_fullscreen?.()) return;
+    if (isFullscreen()) {
+      lockLandscape();
+      return;
+    }
+    requestFullscreen()
+      .then(lockLandscape)
+      .catch(() => lockLandscape());
   };
 
   // File → Import… sets `model.pending_import`. When drained, open a hidden
@@ -216,6 +274,7 @@ async function main() {
     drainExport();
     drainImport();
     drainFullscreenToggle();
+    drainEnterFullscreen();
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

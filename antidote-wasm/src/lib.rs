@@ -238,6 +238,24 @@ pub fn drain_pending_fullscreen_toggle() -> bool {
     true
 }
 
+/// Called by the JS shell each frame. If starting/resuming a game on mobile
+/// set `model.pending_enter_fullscreen`, returns `true` exactly once so the
+/// JS side can call `requestFullscreen` and then
+/// `screen.orientation.lock('landscape')` — still inside the user-gesture
+/// window from the tap. Enter-only, unlike the Fullscreen button's toggle.
+#[wasm_bindgen]
+pub fn drain_pending_enter_fullscreen() -> bool {
+    let Some(model) = shared_model_clone() else {
+        return false;
+    };
+    let mut m = model.borrow_mut();
+    if !m.pending_enter_fullscreen {
+        return false;
+    }
+    m.pending_enter_fullscreen = false;
+    true
+}
+
 fn ensure_wgpu_ctx(width: f32, height: f32) {
     WGPU_CTX.with(|ctx_cell| {
         if ctx_cell.borrow().is_some() {
@@ -329,6 +347,20 @@ pub fn set_device_pixel_ratio(dpr: f64) {
     // Mirror the native shell — LCD subpixel text rendering on standard-DPI
     // displays. Without this, the grayscale outline path emits non-AA text.
     agg_gui::font_settings::set_lcd_enabled(agg_gui::device_scale() <= 1.25);
+    mark_dirty();
+}
+
+/// Called by the JS shell at startup (and if the primary pointer type ever
+/// changes) with the result of `matchMedia("(pointer: coarse)")`. A coarse
+/// pointer means a phone/tablet — the core UI shows the rotate-to-landscape
+/// overlay in portrait and enters fullscreen when a game starts.
+#[wasm_bindgen]
+pub fn set_environment(is_mobile: bool) {
+    ensure_app();
+    let Some(model) = shared_model_clone() else {
+        return;
+    };
+    model.borrow_mut().is_mobile = is_mobile;
     mark_dirty();
 }
 

@@ -67,6 +67,15 @@ pub struct GameModel {
     /// drains this each frame and toggles browser fullscreen — entering if
     /// not currently fullscreen, exiting if so. Cleared by the drain.
     pub pending_fullscreen_toggle: bool,
+    /// True when the platform shell reported a mobile/touch environment
+    /// (coarse primary pointer). Drives the rotate-device overlay and
+    /// enter-fullscreen-on-Play. The native shell never sets it.
+    pub is_mobile: bool,
+    /// Set on mobile when the player starts or resumes a game. The wasm
+    /// shell drains it and calls `requestFullscreen()` +
+    /// `screen.orientation.lock('landscape')`. Enter-only, unlike
+    /// `pending_fullscreen_toggle`. Cleared by the drain.
+    pub pending_enter_fullscreen: bool,
 }
 
 impl GameModel {
@@ -84,6 +93,8 @@ impl GameModel {
             pending_export: false,
             pending_import: false,
             pending_fullscreen_toggle: false,
+            is_mobile: false,
+            pending_enter_fullscreen: false,
         }
     }
 

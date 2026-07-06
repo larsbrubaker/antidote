@@ -13,8 +13,12 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- Suppress the /favicon.ico 404. Real favicon can replace this later. -->
-    <link rel="icon" href="data:," />
+    <!-- Manifest makes the game installable; on Android an installed launch
+         honours `"orientation": "landscape"`. Relative href — the site is
+         served from a subpath on GitHub Pages. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <title>Antidote</title>
     <style>
       /* Canvas fills the entire viewport. We avoid the

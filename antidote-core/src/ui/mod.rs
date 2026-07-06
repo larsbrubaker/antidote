@@ -23,6 +23,7 @@ pub mod life_lost_overlay;
 pub mod menu_bar;
 pub mod menu_widget;
 pub mod overlay_stack;
+pub mod rotate_overlay;
 
 use crate::game::state::Phase;
 use crate::platform::{in_memory_settings_store, SettingsStore};
@@ -37,6 +38,7 @@ use life_lost_overlay::LifeLostOverlay;
 use menu_bar::MenuBar;
 use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseOverlay};
 use overlay_stack::OverlayStack;
+use rotate_overlay::RotateOverlay;
 
 /// CascadiaCode is bundled into the binary so neither shell has to ship a
 /// separate font file. ~388 KB; small enough for both native and wasm.
@@ -69,14 +71,16 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
     let life_lost = LifeLostOverlay::new(model.clone(), font.clone());
     let level_complete = LevelCompleteOverlay::new(model.clone(), font.clone());
     let game_over = GameOverOverlay::new(model.clone(), font.clone());
-    let pause = PauseOverlay::new(model.clone(), font);
+    let pause = PauseOverlay::new(model.clone(), font.clone());
+    let rotate = RotateOverlay::new(model.clone(), font);
 
     // Z-order matters here: front-to-back in painting, back-to-front in hit
     // testing. Game canvas is at the bottom; pause overlay (which the player
     // can summon at any time) sits on top so its buttons win over any other
     // overlay when phase happens to coincide. The menu bar sits ABOVE the
     // main-menu overlay so its top-strip buttons receive clicks before the
-    // main-menu backdrop swallows them.
+    // main-menu backdrop swallows them. The rotate-device prompt is topmost
+    // of all — when a mobile device is in portrait, nothing else matters.
     let root = OverlayStack::new()
         .add(Box::new(game_canvas))
         .add(Box::new(hud))
@@ -87,7 +91,8 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
         .add(Box::new(help_overlay))
         .add(Box::new(level_complete))
         .add(Box::new(game_over))
-        .add(Box::new(pause));
+        .add(Box::new(pause))
+        .add(Box::new(rotate));
 
     let mut app = App::new(Box::new(root));
 

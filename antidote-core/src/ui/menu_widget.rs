@@ -202,6 +202,9 @@ impl MainMenuOverlay {
                 font.clone(),
                 move || {
                     let mut m = resume_model.borrow_mut();
+                    if m.is_mobile {
+                        m.pending_enter_fullscreen = true;
+                    }
                     let m = &mut *m;
                     m.physics = crate::game::physics::PhysicsWorld::new(
                         crate::consts::VIRTUAL_WIDTH,
@@ -220,6 +223,9 @@ impl MainMenuOverlay {
         children.push(primary_button("Play", font.clone(), move || {
             let mut m = play_model.borrow_mut();
             m.clear_saved_session();
+            if m.is_mobile {
+                m.pending_enter_fullscreen = true;
+            }
             let m = &mut *m;
             update::start_new_game(&mut m.world, &mut m.physics);
         }));
@@ -498,6 +504,9 @@ impl GameOverOverlay {
             body_label("Final score: 0", font.clone(), None),
             primary_button("Play again", font.clone(), move || {
                 let mut m = again_model.borrow_mut();
+                if m.is_mobile {
+                    m.pending_enter_fullscreen = true;
+                }
                 let m = &mut *m;
                 update::start_new_game(&mut m.world, &mut m.physics);
             }),

@@ -103,7 +103,9 @@ impl Widget for LifeLostOverlay {
         // this frame.
         let (end_x, end_y) = match layout {
             HudLayout::TopStrip => (50.0_f64, h - HUD_HEIGHT * 0.5),
-            HudLayout::LeftStrip => (HUD_WIDTH * 0.5, h - 24.0),
+            // Both left-panel layouts put "Lives:" at the same offsets from
+            // the left edge, so they share an anchor.
+            HudLayout::LeftStrip | HudLayout::SideColumns => (HUD_WIDTH * 0.5, h - 24.0),
         };
 
         // Eased upward-floating motion — quadratic ease-out lifts the
