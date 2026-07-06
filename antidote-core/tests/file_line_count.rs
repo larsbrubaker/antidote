@@ -31,6 +31,9 @@ const EXCLUDED_DIRS: &[&str] = &[
     // Claude Design export (mockups + its bundled viewer runtime). Design
     // reference material, read-only — treated like gfg/.
     "docs/New Design",
+    // npm-generated lockfile, never hand-edited — same rationale as
+    // Cargo.lock (which isn't a checked extension in the first place).
+    "demo/package-lock.json",
 ];
 
 // Text formats that are part of the project surface area for humans and AI
@@ -82,7 +85,7 @@ fn visit_files(root: &Path, dir: &Path, offenders: &mut Vec<(usize, PathBuf)>) {
 
         if file_type.is_dir() {
             visit_files(root, &path, offenders);
-        } else if file_type.is_file() && should_check_file(&path) {
+        } else if file_type.is_file() && !is_excluded(root, &path) && should_check_file(&path) {
             let lines = count_lines(&path);
             if lines > MAX_LINES {
                 let rel = path.strip_prefix(root).unwrap_or(&path).to_path_buf();

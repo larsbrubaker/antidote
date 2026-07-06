@@ -143,7 +143,15 @@ fn paint_kit_button(ctx: &mut dyn DrawCtx, fonts: &Fonts, b: &KitButton, hover: 
                 drop += 1.0;
                 fill = theme::LIME_400;
             }
-            raised_rect(ctx, r, theme::RADIUS_BUTTON, drop, fill, theme::LIME_700, None);
+            raised_rect(
+                ctx,
+                r,
+                theme::RADIUS_BUTTON,
+                drop,
+                fill,
+                theme::LIME_700,
+                None,
+            );
             ctx.set_font(fonts.extrabold.clone());
             ctx.set_font_size(b.font_size);
             ctx.set_fill_color(theme::INK_900);

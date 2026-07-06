@@ -375,7 +375,13 @@ fn paint_meter(ctx: &mut dyn DrawCtx, r: Rect, t: f32) {
     ctx.set_stroke_color(theme::HAIRLINE);
     ctx.set_line_width(2.0);
     ctx.begin_path();
-    ctx.rounded_rect(r.x + 1.0, r.y + 1.0, r.width - 2.0, r.height - 2.0, radius - 1.0);
+    ctx.rounded_rect(
+        r.x + 1.0,
+        r.y + 1.0,
+        r.width - 2.0,
+        r.height - 2.0,
+        radius - 1.0,
+    );
     ctx.stroke();
 
     let fill_h = r.height * t as f64;
@@ -383,11 +389,22 @@ fn paint_meter(ctx: &mut dyn DrawCtx, r: Rect, t: f32) {
         ctx.set_fill_color(theme::meter_color(t));
         ctx.begin_path();
         // Pill-cap the fill; short fills just render as a stubby pill.
-        ctx.rounded_rect(r.x + 2.0, r.y + 2.0, r.width - 4.0, (fill_h - 4.0).max(2.0), radius - 2.0);
+        ctx.rounded_rect(
+            r.x + 2.0,
+            r.y + 2.0,
+            r.width - 4.0,
+            (fill_h - 4.0).max(2.0),
+            radius - 2.0,
+        );
         ctx.fill();
     }
 
-    ctx.set_stroke_color(Color::rgba(theme::INK_900.r, theme::INK_900.g, theme::INK_900.b, 0.5));
+    ctx.set_stroke_color(Color::rgba(
+        theme::INK_900.r,
+        theme::INK_900.g,
+        theme::INK_900.b,
+        0.5,
+    ));
     ctx.set_line_width(1.0);
     ctx.begin_path();
     for q in [0.25, 0.5, 0.75] {

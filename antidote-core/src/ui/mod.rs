@@ -25,12 +25,14 @@ pub mod menu_bar;
 pub mod menu_widget;
 pub mod overlay_stack;
 pub mod paint_util;
+pub mod petri_kit;
 pub mod rotate_overlay;
+pub mod session_overlays;
 
 use crate::game::state::Phase;
 use crate::platform::{in_memory_settings_store, SettingsStore};
-use canvas_root::CanvasRoot;
 pub use canvas_root::fixed_canvas_ux_scale;
+use canvas_root::CanvasRoot;
 use file_overlay::FileOverlay;
 #[cfg(test)]
 use game_model::shared;
@@ -40,10 +42,10 @@ use help_overlay::HelpOverlay;
 use hud_widget::HudWidget;
 use life_lost_overlay::LifeLostOverlay;
 use menu_bar::MenuBar;
-use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseOverlay};
+use menu_widget::MainMenuOverlay;
 use overlay_stack::OverlayStack;
 use rotate_overlay::RotateOverlay;
-
+use session_overlays::{GameOverOverlay, LevelCompleteOverlay, PauseOverlay};
 
 /// Build the shared Antidote application with an in-memory settings store.
 /// Tests use this; production shells pass a real platform-backed store via
@@ -64,15 +66,15 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
 
     let game_canvas = GameWidget::new(model.clone());
     let hud = HudWidget::new(model.clone(), fonts.clone());
-    let main_menu = MainMenuOverlay::new(model.clone(), font.clone());
-    let menu_bar = MenuBar::new(model.clone(), font.clone());
-    let file_overlay = FileOverlay::new(model.clone(), font.clone());
-    let help_overlay = HelpOverlay::new(model.clone(), font.clone());
+    let main_menu = MainMenuOverlay::new(model.clone(), fonts.clone());
+    let menu_bar = MenuBar::new(model.clone(), font);
+    let file_overlay = FileOverlay::new(model.clone(), fonts.clone());
+    let help_overlay = HelpOverlay::new(model.clone(), fonts.clone());
     let life_lost = LifeLostOverlay::new(model.clone(), fonts.clone());
-    let level_complete = LevelCompleteOverlay::new(model.clone(), font.clone());
-    let game_over = GameOverOverlay::new(model.clone(), font.clone());
-    let pause = PauseOverlay::new(model.clone(), font.clone());
-    let rotate = RotateOverlay::new(model.clone(), font);
+    let level_complete = LevelCompleteOverlay::new(model.clone(), fonts.clone());
+    let game_over = GameOverOverlay::new(model.clone(), fonts.clone());
+    let pause = PauseOverlay::new(model.clone(), fonts.clone());
+    let rotate = RotateOverlay::new(model.clone(), fonts);
 
     // Z-order matters here: front-to-back in painting, back-to-front in hit
     // testing. Game canvas is at the bottom; pause overlay (which the player

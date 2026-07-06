@@ -26,6 +26,13 @@ enum SegStyle {
     Coral,
 }
 
+/// Font size + line height for [`HelpOverlay::paint_rich`], bundled so the
+/// method stays under clippy's argument-count limit.
+struct RichTextStyle {
+    font_size: f64,
+    line_h: f64,
+}
+
 pub struct HelpOverlay {
     bounds: Rect,
     children: Vec<Box<dyn Widget>>,
@@ -55,8 +62,7 @@ impl HelpOverlay {
         x: f64,
         top_baseline: f64,
         max_w: f64,
-        font_size: f64,
-        line_h: f64,
+        style: RichTextStyle,
     ) -> f64 {
         let mut pen_x = x;
         let mut baseline = top_baseline;
@@ -67,13 +73,13 @@ impl HelpOverlay {
                 SegStyle::Coral => (theme::CORAL_500, self.fonts.bold.clone()),
             };
             ctx.set_font(font);
-            ctx.set_font_size(font_size);
+            ctx.set_font_size(style.font_size);
             ctx.set_fill_color(color);
             for word in seg.0.split_inclusive(' ') {
                 let w = ctx.measure_text(word).map(|m| m.width).unwrap_or(0.0);
                 if pen_x + w > x + max_w && pen_x > x {
                     pen_x = x;
-                    baseline -= line_h;
+                    baseline -= style.line_h;
                 }
                 ctx.fill_text(word, pen_x, baseline);
                 pen_x += w;
@@ -154,19 +160,42 @@ impl Widget for HelpOverlay {
             Seg("3 seconds", SegStyle::Lime),
             Seg(" to cure it.", SegStyle::Body),
         ];
-        let after_p1 = self.paint_rich(ctx, &p1, x, panel.y + PANEL_H - 120.0, text_w, 20.0, 32.0);
+        let after_p1 = self.paint_rich(
+            ctx,
+            &p1,
+            x,
+            panel.y + PANEL_H - 120.0,
+            text_w,
+            RichTextStyle {
+                font_size: 20.0,
+                line_h: 32.0,
+            },
+        );
 
         let p2 = [
             Seg("Every bubble drains your ", SegStyle::Body),
             Seg("antidote", SegStyle::Lime),
-            Seg(", and a virus touching a growing bubble costs a ", SegStyle::Body),
+            Seg(
+                ", and a virus touching a growing bubble costs a ",
+                SegStyle::Body,
+            ),
             Seg("life", SegStyle::Coral),
             Seg(
                 ". Clear the dish to advance. That\u{2019}s it — go save the petri dish.",
                 SegStyle::Body,
             ),
         ];
-        let after_p2 = self.paint_rich(ctx, &p2, x, after_p1 - 44.0, text_w, 20.0, 32.0);
+        let after_p2 = self.paint_rich(
+            ctx,
+            &p2,
+            x,
+            after_p1 - 44.0,
+            text_w,
+            RichTextStyle {
+                font_size: 20.0,
+                line_h: 32.0,
+            },
+        );
 
         ctx.set_font(self.fonts.bold.clone());
         ctx.set_font_size(13.0);

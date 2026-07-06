@@ -134,7 +134,13 @@ impl Widget for FileOverlay {
         ctx.set_font(self.fonts.extrabold_italic.clone());
         ctx.set_font_size(40.0);
         ctx.set_fill_color(theme::TEXT_HI);
-        fill_text_tracked(ctx, "SAVE DATA", panel.x + 48.0, panel.y + PANEL_H - 78.0, 0.0);
+        fill_text_tracked(
+            ctx,
+            "SAVE DATA",
+            panel.x + 48.0,
+            panel.y + PANEL_H - 78.0,
+            0.0,
+        );
 
         self.buttons.paint(ctx, &self.fonts);
 

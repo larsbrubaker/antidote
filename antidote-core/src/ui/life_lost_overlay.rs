@@ -61,7 +61,11 @@ impl Widget for LifeLostOverlay {
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
         let (death, lives, elapsed) = {
             let m = self.model.borrow();
-            (m.world.last_life_lost_at, m.world.lives, m.world.phase_elapsed)
+            (
+                m.world.last_life_lost_at,
+                m.world.lives,
+                m.world.phase_elapsed,
+            )
         };
         let Some((dx, dy)) = death else {
             return;

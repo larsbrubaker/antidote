@@ -26,7 +26,9 @@ use crate::game::state::Phase;
 use crate::theme::{self, Fonts};
 use crate::ui::game_model::SharedModel;
 use crate::ui::paint_util::fill_text_centered;
-use crate::ui::petri_kit::{paint_logo_bubble, paint_menu_backdrop, paint_mini_virus, swallow_mouse};
+use crate::ui::petri_kit::{
+    paint_logo_bubble, paint_menu_backdrop, paint_mini_virus, swallow_mouse,
+};
 
 pub struct RotateOverlay {
     bounds: Rect,
@@ -129,10 +131,7 @@ impl Widget for RotateOverlay {
         let tangent = end + std::f64::consts::FRAC_PI_2;
         ctx.set_fill_color(theme::LIME_500);
         ctx.begin_path();
-        ctx.move_to(
-            tip_x + 14.0 * tangent.cos(),
-            tip_y + 14.0 * tangent.sin(),
-        );
+        ctx.move_to(tip_x + 14.0 * tangent.cos(), tip_y + 14.0 * tangent.sin());
         ctx.line_to(
             tip_x + 9.0 * (end + std::f64::consts::PI).cos(),
             tip_y + 9.0 * (end + std::f64::consts::PI).sin(),
@@ -150,7 +149,13 @@ impl Widget for RotateOverlay {
         ctx.set_font(self.fonts.semibold.clone());
         ctx.set_font_size(22.0);
         ctx.set_fill_color(theme::TEXT_MID);
-        fill_text_centered(ctx, "Antidote plays in landscape.", cx, cy - h * 0.13 - 42.0, 0.0);
+        fill_text_centered(
+            ctx,
+            "Antidote plays in landscape.",
+            cx,
+            cy - h * 0.13 - 42.0,
+            0.0,
+        );
 
         ctx.set_font(self.fonts.extrabold_italic.clone());
         ctx.set_font_size(17.0);
