@@ -656,7 +656,7 @@ mod tests {
     }
 
     /// The growing bubble must freeze the instant it spans the playfield's
-    /// shorter axis (2*radius == VIRTUAL_HEIGHT on the current 800×600 field).
+    /// shorter axis (2*radius == VIRTUAL_HEIGHT).
     /// Growing past that looks broken — the bubble is bigger than the box
     /// containing it. Also a regression guard for the old `f32::clamp(min,
     /// max)` panic when `min > max`: with the cap in place that branch is
@@ -666,26 +666,36 @@ mod tests {
         let mut world = World::new();
         let mut physics = PhysicsWorld::new(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         level_init(&mut world, &mut physics);
-        // Move every virus far away so they don't pop the bubble mid-grow.
-        for v in world.viruses.iter_mut() {
-            v.x = 50.0;
-            v.y = 50.0;
-            v.vx = 0.0;
-            v.vy = 0.0;
-            v.last_unstuck_x = 50.0;
-            v.last_unstuck_y = 50.0;
-            if let Some(handle) = v.body {
-                physics.set_body_position(handle, 50.0, 50.0);
-                physics.zero_body_velocity(handle);
+        // Keep every virus in the far corner, but hop between two spots more
+        // than VIRUS_TRAP_DISTANCE apart: a virus that sits still for
+        // VIRUS_TRAP_TIME is trap-killed by the anti-stuck rule, the level
+        // completes, and growth freezes below the cap this test is about.
+        let park_viruses = |world: &mut World, physics: &mut PhysicsWorld, hop: bool| {
+            let x = if hop { 130.0 } else { 60.0 };
+            for v in world.viruses.iter_mut() {
+                v.x = x;
+                v.y = 60.0;
+                v.vx = 0.0;
+                v.vy = 0.0;
+                if let Some(handle) = v.body {
+                    physics.set_body_position(handle, x, 60.0);
+                    physics.zero_body_velocity(handle);
+                }
             }
-        }
+        };
+        park_viruses(&mut world, &mut physics, false);
         let cap = 0.5 * VIRTUAL_WIDTH.min(VIRTUAL_HEIGHT);
+        // Make the antidote budget effectively unlimited so the bubble hits
+        // the geometric cap (the subject of this test) instead of freezing
+        // early when the meter empties — on the redesigned 1016×696 field
+        // the level-1 budget runs out below the cap radius.
+        world.total_antidote_time = 1e6;
         on_pointer_down(&mut world, &mut physics, 400.0, 300.0);
 
-        // Grow well past the antidote budget — 20 simulated seconds is far
-        // more than the ~7.5 s needed to drain antidote, and far more than
-        // the ~3.75 s the bubble would need at 80 px/s to reach radius=300.
-        for _ in 0..1200 {
+        // 20 simulated seconds is far more than the ~4.4 s the bubble needs
+        // at 80 px/s to reach the 348-radius cap.
+        for i in 0..1200 {
+            park_viruses(&mut world, &mut physics, (i / 30) % 2 == 0);
             tick(&mut world, &mut physics, 1.0 / 60.0);
             if let Some(g) = world.growing.as_ref() {
                 assert!(

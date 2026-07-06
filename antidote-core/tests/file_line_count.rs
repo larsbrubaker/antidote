@@ -28,6 +28,9 @@ const EXCLUDED_DIRS: &[&str] = &[
     "reference",
     "demo/dist",
     "demo/public/pkg",
+    // Claude Design export (mockups + its bundled viewer runtime). Design
+    // reference material, read-only — treated like gfg/.
+    "docs/New Design",
 ];
 
 // Text formats that are part of the project surface area for humans and AI

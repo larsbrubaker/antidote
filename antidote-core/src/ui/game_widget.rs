@@ -1,4 +1,4 @@
-//! `GameWidget` — the 800×600 letterboxed play area. Reads + mutates the
+//! `GameWidget` — the letterboxed play area. Reads + mutates the
 //! shared [`GameModel`] each frame; never owns the world directly.
 
 use agg_gui::geometry::Size;
@@ -9,8 +9,8 @@ use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::state::Phase;
 use crate::game::update;
 use crate::render::scene;
+use crate::theme;
 use crate::ui::game_model::SharedModel;
-use crate::ui::hud_widget::{playfield_rect, HudLayout};
 use agg_gui::timestep::FIXED_DT;
 
 pub struct GameWidget {
@@ -34,35 +34,8 @@ impl GameWidget {
         }
     }
 
-    /// Centered 4:3 letterbox inside the slab the HUD didn't claim. Which side
-    /// the HUD claims (top vs. left) is decided by `HudLayout::for_available`
-    /// so both widgets agree on the split each frame.
     fn letterbox(&self) -> Letterbox {
-        let w = self.bounds.width;
-        let h = self.bounds.height;
-        let layout = HudLayout::for_available(w, h);
-        let play = playfield_rect(layout, w, h);
-        let play_w = play.width as f32;
-        let play_h = play.height as f32;
-        let target = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
-        let widget_aspect = if play_h > 0.0 {
-            play_w / play_h
-        } else {
-            target
-        };
-        let scale = if widget_aspect >= target {
-            play_h / VIRTUAL_HEIGHT
-        } else {
-            play_w / VIRTUAL_WIDTH
-        };
-        let game_w = VIRTUAL_WIDTH * scale;
-        let game_h = VIRTUAL_HEIGHT * scale;
-        Letterbox {
-            scale,
-            offset_x: play.x as f32 + (play_w - game_w) * 0.5,
-            offset_y: play.y as f32 + (play_h - game_h) * 0.5,
-            game_h,
-        }
+        arena_letterbox(self.bounds.width, self.bounds.height)
     }
 
     /// Map an event point (widget-local Y-up pixels) to JS-style logical
@@ -85,11 +58,42 @@ impl GameWidget {
     }
 }
 
-struct Letterbox {
-    scale: f32,
-    offset_x: f32,
-    offset_y: f32,
-    game_h: f32,
+pub(crate) struct Letterbox {
+    pub scale: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub game_h: f32,
+}
+
+/// Map the live arena (the [`VIRTUAL_WIDTH`]×[`VIRTUAL_HEIGHT`] game space)
+/// into a canvas of `(w, h)` local Y-up units. The arena sits inside the
+/// playfield panel between the two rails, inset by [`theme::ARENA_INSET`];
+/// at the design canvas size the scale is exactly 1.0, and the min-scale
+/// letterbox below is a safety net for tests laying out at other sizes.
+pub(crate) fn arena_letterbox(w: f64, h: f64) -> Letterbox {
+    let play_x = (theme::PLAYFIELD_X + theme::ARENA_INSET) as f32;
+    let play_y = theme::ARENA_INSET as f32;
+    let play_w = ((w - 2.0 * theme::RAIL_W - 2.0 * theme::ARENA_INSET).max(0.0)) as f32;
+    let play_h = ((h - 2.0 * theme::ARENA_INSET).max(0.0)) as f32;
+    let target = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
+    let widget_aspect = if play_h > 0.0 {
+        play_w / play_h
+    } else {
+        target
+    };
+    let scale = if widget_aspect >= target {
+        play_h / VIRTUAL_HEIGHT
+    } else {
+        play_w / VIRTUAL_WIDTH
+    };
+    let game_w = VIRTUAL_WIDTH * scale;
+    let game_h = VIRTUAL_HEIGHT * scale;
+    Letterbox {
+        scale,
+        offset_x: play_x + (play_w - game_w) * 0.5,
+        offset_y: play_y + (play_h - game_h) * 0.5,
+        game_h,
+    }
 }
 
 impl Widget for GameWidget {
@@ -174,14 +178,31 @@ impl Widget for GameWidget {
         let lb = self.letterbox();
         let time_seconds = model.epoch.elapsed().as_secs_f32();
 
+        // Dish panel + arena boundary paint in widget Y-up coordinates —
+        // the dish extends past the live arena to meet the rails.
+        let panel = agg_gui::Rect::new(
+            theme::PLAYFIELD_X,
+            0.0,
+            (self.bounds.width - 2.0 * theme::RAIL_W).max(0.0),
+            self.bounds.height,
+        );
+        scene::paint_dish_panel(ctx, panel);
+        scene::paint_arena_stroke(
+            ctx,
+            agg_gui::Rect::new(
+                lb.offset_x as f64,
+                lb.offset_y as f64,
+                (VIRTUAL_WIDTH * lb.scale) as f64,
+                lb.game_h as f64,
+            ),
+        );
+
         ctx.save();
         // Map JS Y-down logical (0..W, 0..H) → widget Y-up letterboxed pixels.
         ctx.translate(lb.offset_x as f64, (lb.offset_y + lb.game_h) as f64);
         ctx.scale(lb.scale as f64, -(lb.scale as f64));
 
-        // Draw order matches the JS `render(ctx, state)` function exactly.
-        scene::paint_background_and_grid(ctx);
-        scene::paint_border(ctx);
+        // Entity draw order matches the JS `render(ctx, state)` function.
 
         let world = &model.world;
         for b in &world.solid_bubbles {

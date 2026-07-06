@@ -299,6 +299,12 @@ fn paint_frame(
     ctx.reset(win_w as f32, win_h as f32);
     ctx.set_lcd_mode(agg_gui::font_settings::lcd_enabled());
     begin_frame(ctx, view);
+    // Fixed 1280×720 design canvas: fit it to the window every frame so the
+    // whole tree lays out in design units (CanvasRoot centers the slack).
+    agg_gui::ux_scale::set_ux_scale(antidote_core::ui::fixed_canvas_ux_scale(
+        win_w as f64,
+        win_h as f64,
+    ));
     app.layout(Size::new(win_w as f64, win_h as f64));
     app.paint(ctx);
     ctx.end_frame();

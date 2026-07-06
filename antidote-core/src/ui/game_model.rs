@@ -76,6 +76,11 @@ pub struct GameModel {
     /// `screen.orientation.lock('landscape')`. Enter-only, unlike
     /// `pending_fullscreen_toggle`. Cleared by the drain.
     pub pending_enter_fullscreen: bool,
+    /// `settings.best_score` as it stood when the current run started.
+    /// `maybe_record_best_score` bumps the live best every frame, so this
+    /// snapshot is the only way the game-over screen can tell "you beat
+    /// your old best this run" (gold takeover + previous-best line).
+    pub session_start_best: u64,
 }
 
 impl GameModel {
@@ -95,6 +100,7 @@ impl GameModel {
             pending_fullscreen_toggle: false,
             is_mobile: false,
             pending_enter_fullscreen: false,
+            session_start_best: 0,
         }
     }
 

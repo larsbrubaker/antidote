@@ -14,6 +14,7 @@ use std::sync::Arc;
 use agg_gui::text::Font;
 use agg_gui::{App, Key};
 
+pub mod canvas_root;
 pub mod file_overlay;
 pub mod game_model;
 pub mod game_widget;
@@ -23,10 +24,13 @@ pub mod life_lost_overlay;
 pub mod menu_bar;
 pub mod menu_widget;
 pub mod overlay_stack;
+pub mod paint_util;
 pub mod rotate_overlay;
 
 use crate::game::state::Phase;
 use crate::platform::{in_memory_settings_store, SettingsStore};
+use canvas_root::CanvasRoot;
+pub use canvas_root::fixed_canvas_ux_scale;
 use file_overlay::FileOverlay;
 #[cfg(test)]
 use game_model::shared;
@@ -40,13 +44,6 @@ use menu_widget::{GameOverOverlay, LevelCompleteOverlay, MainMenuOverlay, PauseO
 use overlay_stack::OverlayStack;
 use rotate_overlay::RotateOverlay;
 
-/// CascadiaCode is bundled into the binary so neither shell has to ship a
-/// separate font file. ~388 KB; small enough for both native and wasm.
-const FONT_BYTES: &[u8] = include_bytes!("../../../assets/CascadiaCode.ttf");
-
-fn load_default_font() -> Arc<Font> {
-    Arc::new(Font::from_slice(FONT_BYTES).expect("antidote default font"))
-}
 
 /// Build the shared Antidote application with an in-memory settings store.
 /// Tests use this; production shells pass a real platform-backed store via
@@ -60,15 +57,18 @@ pub fn build_antidote_app() -> (App, SharedModel) {
 /// they can drive their own per-frame hooks.
 pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, SharedModel) {
     let model: SharedModel = shared_with_store(store);
-    let font = load_default_font();
+    let fonts = crate::theme::Fonts::load();
+    // Interim single-face handle for widgets not yet migrated to per-face
+    // `theme::Fonts` fields; SemiBold reads well at label and body sizes.
+    let font: Arc<Font> = fonts.semibold.clone();
 
     let game_canvas = GameWidget::new(model.clone());
-    let hud = HudWidget::new(model.clone(), font.clone());
+    let hud = HudWidget::new(model.clone(), fonts.clone());
     let main_menu = MainMenuOverlay::new(model.clone(), font.clone());
     let menu_bar = MenuBar::new(model.clone(), font.clone());
     let file_overlay = FileOverlay::new(model.clone(), font.clone());
     let help_overlay = HelpOverlay::new(model.clone(), font.clone());
-    let life_lost = LifeLostOverlay::new(model.clone(), font.clone());
+    let life_lost = LifeLostOverlay::new(model.clone(), fonts.clone());
     let level_complete = LevelCompleteOverlay::new(model.clone(), font.clone());
     let game_over = GameOverOverlay::new(model.clone(), font.clone());
     let pause = PauseOverlay::new(model.clone(), font.clone());
@@ -81,7 +81,7 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
     // main-menu overlay so its top-strip buttons receive clicks before the
     // main-menu backdrop swallows them. The rotate-device prompt is topmost
     // of all — when a mobile device is in portrait, nothing else matters.
-    let root = OverlayStack::new()
+    let stack = OverlayStack::new()
         .add(Box::new(game_canvas))
         .add(Box::new(hud))
         .add(Box::new(life_lost))
@@ -93,6 +93,11 @@ pub fn build_antidote_app_with_store(store: Arc<dyn SettingsStore>) -> (App, Sha
         .add(Box::new(game_over))
         .add(Box::new(pause))
         .add(Box::new(rotate));
+
+    // The whole app is authored at the fixed 1280×720 canvas; CanvasRoot
+    // centers it and paints the letterbox bars. Shells keep the scale right
+    // by feeding `fixed_canvas_ux_scale` into `set_ux_scale` on resize.
+    let root = CanvasRoot::new(Box::new(stack));
 
     let mut app = App::new(Box::new(root));
 

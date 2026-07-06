@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+<style>body{margin:0;background:rgba(6,4,12,1)} a{color:rgba(178,255,66,1)} a:hover{color:rgba(210,255,140,1)}</style>
+</helmet>
+<div style="position:relative;width:1280px;height:720px;background:rgba(15,11,26,1);font-family:'Exo 2',sans-serif;overflow:hidden;box-sizing:border-box">
+
+  <!-- PLAYFIELD -->
+  <div style="position:absolute;left:120px;top:0;width:1040px;height:720px;background-color:rgba(20,15,36,1);background-image:linear-gradient(rgba(180,150,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(180,150,255,0.06) 1px, transparent 1px);background-size:40px 40px;overflow:hidden">
+    <div style="position:absolute;left:12px;top:12px;right:12px;bottom:12px;border:2px solid rgba(158,120,255,0.35);border-radius:20px"></div>
+
+    <!-- free viruses -->
+    <sc-for list="{{ viruses }}" as="v" hint-placeholder-count="2">
+      <div style="position:absolute;left:{{v.left}}px;top:{{v.top}}px;width:{{v.size}}px;height:{{v.size}}px">
+        <sc-for list="{{ v.spikes }}" as="s" hint-placeholder-count="8">
+          <div style="position:absolute;left:{{s.left}}px;top:{{s.top}}px;width:10px;height:10px;border-radius:50%;background:rgba(255,92,72,1)"></div>
+        </sc-for>
+        <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 32%, rgba(255,140,110,1), rgba(255,92,72,1) 45%, rgba(150,28,40,1) 95%)"></div>
+        <div style="position:absolute;left:30%;top:26%;width:16%;height:9%;border-radius:50%;background:rgba(255,255,255,0.35);transform:rotate(-25deg)"></div>
+      </div>
+    </sc-for>
+
+    <!-- bubble with trapped virus + cure timer -->
+    <div style="position:absolute;left:450px;top:320px;width:190px;height:190px">
+      <div style="position:absolute;inset:0;border-radius:50%;border:2px solid rgba(210,255,140,0.85);background:radial-gradient(circle at 35% 30%, rgba(178,255,66,0.20), rgba(178,255,66,0.03) 72%)"></div>
+      <div style="position:absolute;left:34px;top:22px;width:34px;height:16px;border-radius:50%;background:rgba(255,255,255,0.45);transform:rotate(-32deg)"></div>
+      <svg width="206" height="206" viewBox="0 0 206 206" style="position:absolute;left:-8px;top:-8px;transform:rotate(-90deg)">
+        <circle cx="103" cy="103" r="99" fill="none" stroke="rgba(178,255,66,0.15)" stroke-width="3"></circle>
+        <circle cx="103" cy="103" r="99" fill="none" stroke="rgba(178,255,66,1)" stroke-width="3" stroke-linecap="round" stroke-dasharray="373 622"></circle>
+      </svg>
+      <div style="position:absolute;left:65px;top:65px;width:60px;height:60px">
+        <sc-for list="{{ trappedSpikes }}" as="s" hint-placeholder-count="8">
+          <div style="position:absolute;left:{{s.left}}px;top:{{s.top}}px;width:9px;height:9px;border-radius:50%;background:rgba(255,92,72,1)"></div>
+        </sc-for>
+        <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 32%, rgba(255,140,110,1), rgba(255,92,72,1) 45%, rgba(150,28,40,1) 95%)"></div>
+      </div>
+      <div style="position:absolute;left:50%;top:-44px;transform:translateX(-50%);padding:4px 14px;border-radius:999px;background:rgba(38,29,64,1);border:1px solid rgba(178,255,66,0.5);color:rgba(178,255,66,1);font-size:18px;font-weight:800;letter-spacing:0.5px;white-space:nowrap">1.2s</div>
+    </div>
+
+    <!-- pop particles -->
+    <div style="position:absolute;left:850px;top:480px;width:6px;height:6px;border-radius:50%;background:rgba(178,255,66,0.9)"></div>
+    <div style="position:absolute;left:880px;top:455px;width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.85)"></div>
+    <div style="position:absolute;left:905px;top:495px;width:8px;height:8px;border-radius:50%;background:rgba(178,255,66,0.6)"></div>
+    <div style="position:absolute;left:868px;top:520px;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.6)"></div>
+    <div style="position:absolute;left:912px;top:462px;width:4px;height:4px;border-radius:50%;background:rgba(178,255,66,0.45)"></div>
+  </div>
+
+  <!-- LEFT RAIL -->
+  <div style="position:absolute;left:0;top:0;width:120px;height:720px;background:rgba(28,21,48,1);border-right:1px solid rgba(233,226,255,0.10);display:flex;flex-direction:column;align-items:center;padding:24px 0;box-sizing:border-box;gap:18px">
+    <div style="width:56px;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);box-shadow:0 4px 0 rgba(8,5,16,1);display:flex;align-items:center;justify-content:center;gap:6px">
+      <div style="width:7px;height:22px;border-radius:3px;background:rgba(240,236,255,1)"></div>
+      <div style="width:7px;height:22px;border-radius:3px;background:rgba(240,236,255,1)"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">LEVEL</div>
+      <div style="font-size:40px;font-weight:800;color:rgba(240,236,255,1);line-height:1">{{ levelText }}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+      <div style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">LIVES</div>
+      <div style="display:flex;gap:8px">
+        <sc-for list="{{ pips }}" as="p" hint-placeholder-count="3">
+          <div style="width:18px;height:18px;border-radius:50%;background:{{p.bg}};border:2px solid {{p.stroke}};box-sizing:border-box"></div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;min-height:0;padding-top:6px">
+      <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:rgba(178,255,66,1)">ANTIDOTE</div>
+      <div style="flex:1;width:30px;border-radius:999px;background:rgba(38,29,64,1);border:2px solid rgba(233,226,255,0.10);position:relative;overflow:hidden;box-sizing:border-box">
+        <div style="position:absolute;left:0;right:0;bottom:0;height:{{ meterFill }};background:{{ meterColor }};border-radius:999px"></div>
+        <div style="position:absolute;left:0;right:0;top:25%;height:1px;background:rgba(15,11,26,0.5)"></div>
+        <div style="position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(15,11,26,0.5)"></div>
+        <div style="position:absolute;left:0;right:0;top:75%;height:1px;background:rgba(15,11,26,0.5)"></div>
+      </div>
+      <div style="font-size:18px;font-weight:800;color:{{ meterColor }}">{{ meterText }}</div>
+    </div>
+  </div>
+
+  <!-- RIGHT RAIL -->
+  <div style="position:absolute;right:0;top:0;width:120px;height:720px;background:rgba(28,21,48,1);border-left:1px solid rgba(233,226,255,0.10);display:flex;flex-direction:column;align-items:center;padding:24px 0;box-sizing:border-box;gap:14px">
+    <div style="width:56px;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);box-shadow:0 4px 0 rgba(8,5,16,1);display:flex;align-items:center;justify-content:center">
+      <div style="position:relative;width:24px;height:24px">
+        <div style="position:absolute;inset:0;border:3px solid rgba(240,236,255,1);border-radius:5px"></div>
+        <div style="position:absolute;left:-3px;right:-3px;top:7px;height:10px;background:rgba(38,29,64,1)"></div>
+        <div style="position:absolute;top:-3px;bottom:-3px;left:7px;width:10px;background:rgba(38,29,64,1)"></div>
+      </div>
+    </div>
+    <div style="width:56px;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);box-shadow:0 4px 0 rgba(8,5,16,1);display:flex;align-items:center;justify-content:center">
+      <div style="position:relative;width:30px;height:26px">
+        <div style="position:absolute;left:0;top:8px;width:6px;height:10px;border-radius:2px;background:rgba(240,236,255,1)"></div>
+        <div style="position:absolute;left:4px;top:5px;width:9px;height:16px;background:rgba(240,236,255,1);border-radius:2px;transform:skewY(0deg)"></div>
+        <div style="position:absolute;left:11px;top:4px;width:16px;height:16px;border:2px solid transparent;border-right-color:rgba(240,236,255,1);border-radius:50%"></div>
+        <div style="position:absolute;left:8px;top:-1px;width:26px;height:26px;border:2px solid transparent;border-right-color:rgba(240,236,255,0.6);border-radius:50%"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:10px">
+      <div style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">SCORE</div>
+      <div style="font-size:30px;font-weight:800;color:rgba(240,236,255,1);line-height:1.1;font-variant-numeric:tabular-nums">{{ scoreText }}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">BEST</div>
+      <div style="font-size:20px;font-weight:800;color:rgba(255,206,84,1);line-height:1.1;font-variant-numeric:tabular-nums">{{ bestText }}</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:720},&quot;level&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;min&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;score&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:12450,&quot;min&quot;:0,&quot;tsType&quot;:&quot;number&quot;},&quot;best&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:48200,&quot;min&quot;:0,&quot;tsType&quot;:&quot;number&quot;},&quot;lives&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2,&quot;min&quot;:0,&quot;max&quot;:3,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;},&quot;meter&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:62,&quot;min&quot;:0,&quot;max&quot;:100,&quot;step&quot;:1,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const num = (v, d) => { const n = Number(v); return Number.isFinite(n) && v !== undefined && v !== "" ? n : d; };
+    const level = num(this.props.level, 3);
+    const score = num(this.props.score, 12450);
+    const best = num(this.props.best, 48200);
+    const lives = num(this.props.lives, 2);
+    const meter = Math.max(0, Math.min(100, num(this.props.meter, 62)));
+    const fmt = (n) => n.toLocaleString("en-US");
+    const meterColor = meter < 34 ? "rgba(255,92,72,1)" : meter < 67 ? "rgba(255,196,54,1)" : "rgba(178,255,66,1)";
+    const pips = [0, 1, 2].map((i) => i < lives
+      ? { bg: "rgba(178,255,66,1)", stroke: "rgba(178,255,66,1)" }
+      : { bg: "transparent", stroke: "rgba(122,112,152,0.7)" });
+    const mkSpikes = (d) => {
+      const r = d / 2;
+      return Array.from({ length: 8 }, (_, i) => {
+        const a = (i * Math.PI) / 4;
+        return { left: Math.round(r + Math.cos(a) * r - 5), top: Math.round(r + Math.sin(a) * r - 5) };
+      });
+    };
+    const viruses = [
+      { left: 260, top: 130, size: 64 },
+      { left: 730, top: 90, size: 50 },
+      { left: 180, top: 500, size: 56 },
+    ].map((v) => ({ ...v, spikes: mkSpikes(v.size) }));
+    return {
+      levelText: String(level),
+      scoreText: fmt(score),
+      bestText: fmt(best),
+      pips,
+      viruses,
+      trappedSpikes: mkSpikes(60),
+      meterFill: meter + "%",
+      meterColor,
+      meterText: meter + "%",
+    };
+  }
+}
+</script>
+</body>
+</html>

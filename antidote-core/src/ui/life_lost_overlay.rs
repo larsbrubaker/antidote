@@ -1,37 +1,36 @@
-//! `LifeLostOverlay` — animates a small "−1" indicator floating from the
-//! death point on the playfield up to the HUD's lives counter while the game
-//! is in [`Phase::LifeLost`]. Purely visual; no event handling.
+//! `LifeLostOverlay` — the Petri Pop life-lost interstitial (design screen
+//! 06): a coral vignette pulses over the playfield while "−1 LIFE" floats up
+//! from the death point with a "N LEFT — BREATHE" caption. Purely visual;
+//! input stays live.
 
-use std::sync::Arc;
-
-use agg_gui::color::Color;
 use agg_gui::geometry::Size;
-use agg_gui::text::Font;
+use agg_gui::paints::RadialGradientPaint;
 use agg_gui::{DrawCtx, Event, EventResult, Rect, Widget};
 
-use crate::consts::{VIRTUAL_HEIGHT, VIRTUAL_WIDTH};
 use crate::game::state::Phase;
 use crate::game::update::LIFE_LOST_DURATION;
+use crate::theme::{self, Fonts};
 use crate::ui::game_model::SharedModel;
-use crate::ui::hud_widget::{playfield_rect, HudLayout, HUD_HEIGHT, HUD_WIDTH};
+use crate::ui::game_widget::arena_letterbox;
+use crate::ui::paint_util::fill_text_centered;
 
-const HEART_RADIUS: f64 = 18.0;
-const FONT_SIZE: f64 = 18.0;
+/// How far the text block rises over the interstitial (design units).
+const FLOAT_RISE: f64 = 60.0;
 
 pub struct LifeLostOverlay {
     bounds: Rect,
     children: Vec<Box<dyn Widget>>,
     model: SharedModel,
-    font: Arc<Font>,
+    fonts: Fonts,
 }
 
 impl LifeLostOverlay {
-    pub fn new(model: SharedModel, font: Arc<Font>) -> Self {
+    pub fn new(model: SharedModel, fonts: Fonts) -> Self {
         Self {
             bounds: Rect::default(),
             children: Vec::new(),
             model,
-            font,
+            fonts,
         }
     }
 }
@@ -60,93 +59,86 @@ impl Widget for LifeLostOverlay {
     }
 
     fn paint(&mut self, ctx: &mut dyn DrawCtx) {
-        let model = self.model.borrow();
-        let world = &model.world;
-        let Some((dx, dy)) = world.last_life_lost_at else {
+        let (death, lives, elapsed) = {
+            let m = self.model.borrow();
+            (m.world.last_life_lost_at, m.world.lives, m.world.phase_elapsed)
+        };
+        let Some((dx, dy)) = death else {
             return;
         };
 
-        // Letterbox transform — keeps the start anchor lined up with the
-        // exact pixel where the bubble popped. Mirrors GameWidget::letterbox,
-        // including the HUD-strip carve-out so the "−1" rises from inside
-        // the play area, not from inside the chrome.
-        let w = self.bounds.width;
-        let h = self.bounds.height;
-        let layout = HudLayout::for_available(w, h);
-        let play = playfield_rect(layout, w, h);
-        let play_w = play.width as f32;
-        let play_h = play.height as f32;
-        let target = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
-        let widget_aspect = if play_h > 0.0 {
-            play_w / play_h
-        } else {
-            target
-        };
-        let scale = if widget_aspect >= target {
-            play_h / VIRTUAL_HEIGHT
-        } else {
-            play_w / VIRTUAL_WIDTH
-        };
-        if scale <= 0.0 {
+        let lb = arena_letterbox(self.bounds.width, self.bounds.height);
+        if lb.scale <= 0.0 {
             return;
         }
-        let game_w = VIRTUAL_WIDTH * scale;
-        let game_h = VIRTUAL_HEIGHT * scale;
-        let offset_x = play.x as f32 + (play_w - game_w) * 0.5;
-        let offset_y = play.y as f32 + (play_h - game_h) * 0.5;
-
         // JS-style logical (Y-down) → widget Y-up pixels.
-        let start_x = (offset_x + dx * scale) as f64;
-        let start_y = (offset_y + game_h - dy * scale) as f64;
+        let death_x = (lb.offset_x + dx * lb.scale) as f64;
+        let death_y = (lb.offset_y + lb.game_h - dy * lb.scale) as f64;
 
-        // End anchor: under the "Lives:" label, wherever the HUD is sitting
-        // this frame.
-        let (end_x, end_y) = match layout {
-            HudLayout::TopStrip => (50.0_f64, h - HUD_HEIGHT * 0.5),
-            // Both left-panel layouts put "Lives:" at the same offsets from
-            // the left edge, so they share an anchor.
-            HudLayout::LeftStrip | HudLayout::SideColumns => (HUD_WIDTH * 0.5, h - 24.0),
-        };
+        let t_raw = (elapsed / LIFE_LOST_DURATION).clamp(0.0, 1.0) as f64;
 
-        // Eased upward-floating motion — quadratic ease-out lifts the
-        // indicator quickly, then settles into the HUD slot.
-        let t_raw = (world.phase_elapsed / LIFE_LOST_DURATION).clamp(0.0, 1.0);
-        let t = 1.0 - (1.0 - t_raw).powf(2.0);
-        let cx = start_x + (end_x - start_x) * t as f64;
-        let cy = start_y + (end_y - start_y) * t as f64;
-
-        // Fade in at the start, out at the end.
-        let alpha: f32 = if t_raw < 0.15 {
-            t_raw / 0.15
-        } else if t_raw > 0.85 {
-            (1.0 - t_raw) / 0.15
+        // Coral vignette over the playfield panel: transparent at the death
+        // point, coral at the panel edge. Alpha ramps 0→1→0 (in 20%,
+        // out after 60%).
+        let vignette_a = if t_raw < 0.2 {
+            t_raw / 0.2
+        } else if t_raw > 0.6 {
+            ((1.0 - t_raw) / 0.4).max(0.0)
         } else {
             1.0
+        };
+        if vignette_a > 0.0 {
+            let peak = 0.26 * vignette_a;
+            let coral = theme::CORAL_500;
+            let panel_w = self.bounds.width - 2.0 * theme::RAIL_W;
+            let radius = (panel_w.powi(2) + self.bounds.height.powi(2)).sqrt() * 0.55;
+            ctx.set_fill_radial_gradient(RadialGradientPaint::centered(
+                death_x,
+                death_y,
+                radius,
+                &[
+                    (0.0, coral.with_alpha(0.0)),
+                    (0.48, coral.with_alpha(0.0)),
+                    (1.0, coral.with_alpha(peak as f32)),
+                ],
+            ));
+            ctx.begin_path();
+            ctx.rect(theme::PLAYFIELD_X, 0.0, panel_w, self.bounds.height);
+            ctx.fill();
         }
-        .clamp(0.0, 1.0);
 
-        // Heart-ish red disc with a thin glow.
-        ctx.set_fill_color(Color::rgba(1.0, 0.32, 0.36, alpha));
-        ctx.begin_path();
-        ctx.circle(cx, cy, HEART_RADIUS);
-        ctx.fill();
+        // Text block floats up from just above the death point and fades in
+        // fast / out at the end. Quadratic ease-out on the rise.
+        let rise = 1.0 - (1.0 - t_raw).powi(2);
+        let text_a = if t_raw < 0.12 {
+            t_raw / 0.12
+        } else if t_raw > 0.8 {
+            ((1.0 - t_raw) / 0.2).max(0.0)
+        } else {
+            1.0
+        } as f32;
+        let base_y = death_y + 90.0 + rise * FLOAT_RISE;
+        // Keep the block inside the playfield panel.
+        let cx = death_x.clamp(
+            theme::PLAYFIELD_X + 140.0,
+            self.bounds.width - theme::RAIL_W - 140.0,
+        );
+        let base_y = base_y.min(self.bounds.height - 80.0);
 
-        ctx.set_stroke_color(Color::rgba(1.0, 0.78, 0.82, 0.85 * alpha));
-        ctx.set_line_width(1.5);
-        ctx.begin_path();
-        ctx.circle(cx, cy, HEART_RADIUS + 1.2);
-        ctx.stroke();
+        ctx.set_font(self.fonts.extrabold_italic.clone());
+        ctx.set_font_size(46.0);
+        ctx.set_fill_color(theme::CORAL_500.with_alpha(text_a));
+        fill_text_centered(ctx, "−1 LIFE", cx, base_y, 1.0);
 
-        // "−1" label centered on the disc.
-        ctx.set_font(self.font.clone());
-        ctx.set_font_size(FONT_SIZE);
-        ctx.set_fill_color(Color::rgba(1.0, 1.0, 1.0, alpha));
-        let label = "-1";
-        if let Some(m) = ctx.measure_text(label) {
-            let tx = cx - m.width * 0.5;
-            let ty = cy + FONT_SIZE * 0.32;
-            ctx.fill_text(label, tx, ty);
-        }
+        let caption = match lives {
+            0 => "NONE LEFT".to_string(),
+            1 => "1 LEFT — BREATHE".to_string(),
+            n => format!("{n} LEFT — BREATHE"),
+        };
+        ctx.set_font(self.fonts.bold.clone());
+        ctx.set_font_size(16.0);
+        ctx.set_fill_color(theme::TEXT_MID.with_alpha(text_a));
+        fill_text_centered(ctx, &caption, cx, base_y - 30.0, 3.0);
     }
 
     fn on_event(&mut self, _event: &Event) -> EventResult {

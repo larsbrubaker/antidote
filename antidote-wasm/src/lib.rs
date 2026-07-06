@@ -331,6 +331,12 @@ pub fn render(width: u32, height: u32, _frame_ms: f64) {
         APP.with(|app_cell| {
             let mut app = app_cell.borrow_mut();
             if let Some(app) = app.as_mut() {
+                // Fixed 1280×720 design canvas: fit it to the backing-store
+                // size every frame (CanvasRoot centers the slack).
+                agg_gui::ux_scale::set_ux_scale(antidote_core::ui::fixed_canvas_ux_scale(
+                    width as f64,
+                    height as f64,
+                ));
                 app.layout(agg_gui::Size::new(width as f64, height as f64));
                 app.paint(ctx);
             }

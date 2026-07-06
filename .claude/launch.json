@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "demo",
       "port": 5173
+    },
+    {
+      "name": "design-docs",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8931", "--directory", "docs/New Design"],
+      "port": 8931
     }
   ]
 }

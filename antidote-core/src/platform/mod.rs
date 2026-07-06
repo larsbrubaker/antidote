@@ -34,6 +34,14 @@ pub struct Settings {
     /// Cleared on `Game over` and on `New game`.
     #[serde(default)]
     pub saved_session: Option<SavedSession>,
+    /// Sound toggle. The game has no audio yet — the HUD's mute button
+    /// persists intent so sound ships pre-muted for players who asked.
+    #[serde(default)]
+    pub muted: bool,
+    /// First-run hint overlay: set once the player dismisses it (or lands
+    /// their first cure); never shown again on this device.
+    #[serde(default)]
+    pub seen_hints: bool,
 }
 
 const CURRENT_VERSION: u32 = 1;

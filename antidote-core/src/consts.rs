@@ -1,9 +1,13 @@
-//! Game-design constants ported verbatim from
+//! Game-design constants ported from
 //! `gfg/public/games/antidote/antidote-core.js` and `antidote-physics.js`.
-//! All values match the JS reference exactly.
+//! Body/physics values match the JS reference exactly; the playfield size
+//! does NOT — the Petri Pop redesign (see `docs/redesign-plan.md`) replaced
+//! the JS 800×600 field with the live arena inside the 1280×720 canvas.
 
-pub const VIRTUAL_WIDTH: f32 = 800.0;
-pub const VIRTUAL_HEIGHT: f32 = 600.0;
+/// Live physics/game area: the 1040×720 playfield panel inset by
+/// [`crate::theme::ARENA_INSET`] on every side.
+pub const VIRTUAL_WIDTH: f32 = 1016.0;
+pub const VIRTUAL_HEIGHT: f32 = 696.0;
 
 // Virus
 pub const VIRUS_RADIUS: f32 = 12.0;

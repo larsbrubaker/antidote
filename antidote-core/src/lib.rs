@@ -4,4 +4,5 @@ pub mod consts;
 pub mod game;
 pub mod platform;
 pub mod render;
+pub mod theme;
 pub mod ui;

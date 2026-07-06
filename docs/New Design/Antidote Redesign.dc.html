@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+<style>body{margin:0;background:rgba(6,4,12,1)} a{color:rgba(178,255,66,1)} a:hover{color:rgba(210,255,140,1)}</style>
+</helmet>
+<section style="font-family:'Exo 2',sans-serif;color:rgba(240,236,255,1);padding:64px;display:flex;flex-direction:column;gap:64px;width:2688px;box-sizing:content-box">
+
+  <!-- INTRO -->
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:1200px">
+    <div style="font-size:44px;font-weight:800;font-style:italic;letter-spacing:-1px">Antidote — “Petri Pop” redesign</div>
+    <div style="font-size:19px;color:rgba(178,168,210,1);line-height:1.55">Canvas <b style="color:rgba(240,236,255,1)">1280×720</b> virtual units · rails <b style="color:rgba(240,236,255,1)">120 / playfield 1040 / 120</b> · font <b style="color:rgba(240,236,255,1)">Exo 2</b> (single OFL variable TTF, weights 400–900 + italic) · palette: violet-ink dish, acid-lime antidote, coral viruses, gold celebration. Everything below is solid fills, gradients, circles, rounded rects, 1–3px strokes, and text.</div>
+  </div>
+
+  <!-- ============ SCREENS ============ -->
+  <div style="display:flex;flex-wrap:wrap;gap:64px;align-items:flex-start">
+
+    <!-- 1a MAIN MENU -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1a" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1a</a><span style="font-size:20px;font-weight:700">01 · Main menu</span><span style="font-size:14px;color:rgba(178,168,210,1)">replaces the Win95 menu bar</span></div>
+      <div style="position:relative;width:1280px;height:720px;background-color:rgba(15,11,26,1);background-image:linear-gradient(rgba(180,150,255,0.05) 1px, transparent 1px),linear-gradient(90deg, rgba(180,150,255,0.05) 1px, transparent 1px);background-size:40px 40px;overflow:hidden;border:1px solid rgba(233,226,255,0.10)">
+        <div style="position:absolute;left:420px;top:-40px;width:440px;height:440px;border-radius:50%;border:2px solid rgba(178,255,66,0.10);background:radial-gradient(circle at 40% 35%, rgba(178,255,66,0.06), transparent 70%)"></div>
+        <div style="position:absolute;left:120px;top:480px;width:70px;height:70px;opacity:0.5">
+          <div style="position:absolute;left:30px;top:-5px;width:10px;height:10px;border-radius:50%;background:rgba(255,92,72,1)"></div><div style="position:absolute;left:30px;top:65px;width:10px;height:10px;border-radius:50%;background:rgba(255,92,72,1)"></div><div style="position:absolute;left:-5px;top:30px;width:10px;height:10px;border-radius:50%;background:rgba(255,92,72,1)"></div><div style="position:absolute;left:65px;top:30px;width:10px;height:10px;border-radius:50%;background:rgba(255,92,72,1)"></div>
+          <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 32%, rgba(255,140,110,1), rgba(255,92,72,1) 45%, rgba(150,28,40,1) 95%)"></div>
+        </div>
+        <div style="position:absolute;right:200px;top:560px;width:46px;height:46px;opacity:0.4">
+          <div style="position:absolute;left:18px;top:-4px;width:8px;height:8px;border-radius:50%;background:rgba(255,92,72,1)"></div><div style="position:absolute;left:18px;top:42px;width:8px;height:8px;border-radius:50%;background:rgba(255,92,72,1)"></div><div style="position:absolute;left:-4px;top:18px;width:8px;height:8px;border-radius:50%;background:rgba(255,92,72,1)"></div><div style="position:absolute;left:42px;top:18px;width:8px;height:8px;border-radius:50%;background:rgba(255,92,72,1)"></div>
+          <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 32%, rgba(255,140,110,1), rgba(255,92,72,1) 45%, rgba(150,28,40,1) 95%)"></div>
+        </div>
+
+        <div style="position:absolute;left:0;right:0;top:110px;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="display:flex;align-items:center;font-style:italic;font-weight:800;font-size:96px;letter-spacing:-2px;line-height:1">ANTID<span style="position:relative;display:inline-block;width:78px;height:78px;margin:0 6px;transform:translateY(4px)"><span style="position:absolute;inset:0;border-radius:50%;border:5px solid rgba(178,255,66,1);background:radial-gradient(circle at 35% 30%, rgba(178,255,66,0.25), rgba(178,255,66,0.04) 72%)"></span><span style="position:absolute;left:14px;top:10px;width:16px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);transform:rotate(-30deg)"></span><span style="position:absolute;left:26px;top:26px;width:26px;height:26px"><span style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 32%, rgba(255,140,110,1), rgba(255,92,72,1) 45%, rgba(150,28,40,1) 95%)"></span><span style="position:absolute;left:9px;top:-4px;width:7px;height:7px;border-radius:50%;background:rgba(255,92,72,1)"></span><span style="position:absolute;left:9px;top:23px;width:7px;height:7px;border-radius:50%;background:rgba(255,92,72,1)"></span><span style="position:absolute;left:-4px;top:9px;width:7px;height:7px;border-radius:50%;background:rgba(255,92,72,1)"></span><span style="position:absolute;left:23px;top:9px;width:7px;height:7px;border-radius:50%;background:rgba(255,92,72,1)"></span></span></span>TE</div>
+          <div style="font-size:17px;font-weight:800;letter-spacing:5px;color:rgba(178,255,66,1)">TRAP ’EM · CURE ’EM</div>
+        </div>
+
+        <div style="position:absolute;left:0;right:0;top:330px;display:flex;flex-direction:column;align-items:center;gap:18px">
+          <div style="display:flex;align-items:center;justify-content:center;width:300px;height:68px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:26px;font-weight:800;letter-spacing:2px;box-shadow:0 6px 0 rgba(98,178,22,1)">PLAY</div>
+          <div style="display:flex;align-items:center;justify-content:center;width:300px;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);color:rgba(240,236,255,1);font-size:20px;font-weight:800;letter-spacing:1.5px;box-shadow:0 6px 0 rgba(8,5,16,1)">RESUME · LV 3</div>
+        </div>
+
+        <div style="position:absolute;right:72px;top:150px;width:280px;background:rgba(28,21,48,0.92);border:1px solid rgba(233,226,255,0.10);border-radius:20px;box-shadow:0 6px 0 rgba(8,5,16,1);padding:22px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:13px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">BEST</div>
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:34px;font-weight:800;color:rgba(255,206,84,1);font-variant-numeric:tabular-nums">48,200</span><span style="font-size:18px;color:rgba(255,206,84,1)">★</span></div>
+          <div style="height:1px;background:rgba(233,226,255,0.10);margin:6px 0"></div>
+          <div style="font-size:13px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">RECENT</div>
+          <div style="display:flex;justify-content:space-between;font-variant-numeric:tabular-nums"><span style="font-size:14px;font-weight:800;color:rgba(178,255,66,1)">01</span><span style="font-size:20px;font-weight:800">48,200</span></div>
+          <div style="display:flex;justify-content:space-between;font-variant-numeric:tabular-nums"><span style="font-size:14px;font-weight:800;color:rgba(122,112,152,1)">02</span><span style="font-size:20px;font-weight:700;color:rgba(178,168,210,1)">31,050</span></div>
+          <div style="display:flex;justify-content:space-between;font-variant-numeric:tabular-nums"><span style="font-size:14px;font-weight:800;color:rgba(122,112,152,1)">03</span><span style="font-size:20px;font-weight:700;color:rgba(178,168,210,1)">27,400</span></div>
+          <div style="display:flex;justify-content:space-between;font-variant-numeric:tabular-nums"><span style="font-size:14px;font-weight:800;color:rgba(122,112,152,1)">04</span><span style="font-size:20px;font-weight:700;color:rgba(178,168,210,1)">19,880</span></div>
+          <div style="display:flex;justify-content:space-between;font-variant-numeric:tabular-nums"><span style="font-size:14px;font-weight:800;color:rgba(122,112,152,1)">05</span><span style="font-size:20px;font-weight:700;color:rgba(178,168,210,1)">12,450</span></div>
+        </div>
+
+        <div style="position:absolute;left:0;right:0;bottom:40px;display:flex;justify-content:center;gap:20px">
+          <div style="display:flex;align-items:center;gap:10px;height:48px;padding:0 22px;border-radius:14px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);box-shadow:0 4px 0 rgba(8,5,16,1)"><span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:2px solid rgba(178,255,66,1);color:rgba(178,255,66,1);font-size:14px;font-weight:800">?</span><span style="font-size:17px;font-weight:700;letter-spacing:1px">HELP</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:48px;padding:0 22px;border-radius:14px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);box-shadow:0 4px 0 rgba(8,5,16,1)"><span style="position:relative;width:18px;height:18px"><span style="position:absolute;inset:0;border:2px solid rgba(178,255,66,1);border-radius:4px"></span><span style="position:absolute;left:4px;bottom:2px;right:4px;height:6px;background:rgba(178,255,66,1);border-radius:1px"></span></span><span style="font-size:17px;font-weight:700;letter-spacing:1px">FILE</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:48px;padding:0 22px;border-radius:14px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);box-shadow:0 4px 0 rgba(8,5,16,1)"><span style="position:relative;width:18px;height:18px"><span style="position:absolute;inset:0;border:2px solid rgba(178,255,66,1);border-radius:4px"></span><span style="position:absolute;left:-2px;right:-2px;top:5px;height:8px;background:rgba(38,29,64,1)"></span><span style="position:absolute;top:-2px;bottom:-2px;left:5px;width:8px;background:rgba(38,29,64,1)"></span></span><span style="font-size:17px;font-weight:700;letter-spacing:1px">FULLSCREEN</span></div>
+        </div>
+        <div style="position:absolute;left:24px;bottom:20px;font-size:13px;color:rgba(122,112,152,1);font-weight:600">v2.0 · saves stay on this device</div>
+      </div>
+    </div>
+
+    <!-- 1b IN-GAME -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1b" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1b</a><span style="font-size:20px;font-weight:700">02 · In-game (playing)</span><span style="font-size:14px;color:rgba(178,168,210,1)">rails: pause / level / lives / antidote — fullscreen / mute / score / best</span></div>
+      <div style="position:relative;width:1280px;height:720px;border:1px solid rgba(233,226,255,0.10)">
+        <dc-import name="Antidote Frame" level="3" score="12450" best="48200" lives="2" meter="62" hint-size="1280px,720px" style="position:absolute;inset:0"></dc-import>
+      </div>
+    </div>
+
+    <!-- 1c PAUSE -->
+    <div id="1c" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1c" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1c</a><span style="font-size:20px;font-weight:700">03 · Pause overlay</span><span style="font-size:14px;color:rgba(178,168,210,1)">rails stay live; scrim covers playfield only</span></div>
+      <div style="position:relative;width:1280px;height:720px;border:1px solid rgba(233,226,255,0.10)">
+        <dc-import name="Antidote Frame" level="3" score="12450" best="48200" lives="2" meter="62" hint-size="1280px,720px" style="position:absolute;inset:0"></dc-import>
+        <div style="position:absolute;left:120px;top:0;width:1040px;height:720px;background:rgba(10,7,20,0.78)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:420px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;box-shadow:0 8px 0 rgba(8,5,16,1);padding:40px 44px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:22px">
+          <div style="font-size:52px;font-weight:800;font-style:italic;letter-spacing:1px">PAUSED</div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:24px;font-weight:800;letter-spacing:2px;box-shadow:0 6px 0 rgba(98,178,22,1)">RESUME</div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 6px 0 rgba(8,5,16,1)">BACK TO MENU</div>
+          <div style="font-size:15px;font-weight:600;color:rgba(122,112,152,1)">tap the pause button anytime · Esc / P on desktop</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1d LEVEL COMPLETE -->
+    <div id="1d" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1d" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1d</a><span style="font-size:20px;font-weight:700">04 · Level complete</span></div>
+      <div style="position:relative;width:1280px;height:720px;border:1px solid rgba(233,226,255,0.10)">
+        <dc-import name="Antidote Frame" level="3" score="12450" best="48200" lives="2" meter="78" hint-size="1280px,720px" style="position:absolute;inset:0"></dc-import>
+        <div style="position:absolute;left:120px;top:0;width:1040px;height:720px;background:rgba(10,7,20,0.78)"></div>
+        <div style="position:absolute;left:500px;top:180px;width:12px;height:16px;background:rgba(178,255,66,1);transform:rotate(24deg)"></div>
+        <div style="position:absolute;left:820px;top:150px;width:10px;height:14px;background:rgba(255,206,84,1);transform:rotate(-30deg)"></div>
+        <div style="position:absolute;left:400px;top:520px;width:10px;height:10px;border-radius:50%;background:rgba(158,120,255,1)"></div>
+        <div style="position:absolute;left:900px;top:540px;width:12px;height:16px;background:rgba(255,92,72,1);transform:rotate(40deg)"></div>
+        <div style="position:absolute;left:360px;top:300px;width:9px;height:9px;border-radius:50%;background:rgba(255,206,84,1)"></div>
+        <div style="position:absolute;left:930px;top:330px;width:11px;height:15px;background:rgba(178,255,66,1);transform:rotate(-18deg)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:480px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;box-shadow:0 8px 0 rgba(8,5,16,1);padding:40px 48px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:18px">
+          <div style="font-size:48px;font-weight:800;font-style:italic;color:rgba(178,255,66,1);letter-spacing:0.5px">LEVEL 3 CLEAR!</div>
+          <div style="display:flex;justify-content:space-between;width:100%;align-items:baseline"><span style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">LEVEL SCORE</span><span style="font-size:28px;font-weight:800;font-variant-numeric:tabular-nums">+2,450</span></div>
+          <div style="height:1px;background:rgba(233,226,255,0.10);width:100%"></div>
+          <div style="display:flex;justify-content:space-between;width:100%;align-items:baseline"><span style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">TOTAL</span><span style="font-size:40px;font-weight:800;font-variant-numeric:tabular-nums">12,450</span></div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:24px;font-weight:800;letter-spacing:2px;box-shadow:0 6px 0 rgba(98,178,22,1);margin-top:6px">NEXT LEVEL</div>
+          <div style="font-size:18px;font-weight:700;letter-spacing:1.5px;color:rgba(178,168,210,1)">BACK TO MENU</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1e GAME OVER / NEW BEST -->
+    <div id="1e" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1e" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1e</a><span style="font-size:20px;font-weight:700">05 · Game over — new best</span><span style="font-size:14px;color:rgba(178,168,210,1)">gold takeover; plain game-over uses same panel minus gold</span></div>
+      <div style="position:relative;width:1280px;height:720px;border:1px solid rgba(233,226,255,0.10)">
+        <dc-import name="Antidote Frame" level="5" score="51730" best="51730" lives="0" meter="8" hint-size="1280px,720px" style="position:absolute;inset:0"></dc-import>
+        <div style="position:absolute;left:120px;top:0;width:1040px;height:720px;background:rgba(10,7,20,0.82)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:560px;height:560px;border-radius:50%;border:3px solid rgba(255,206,84,0.28)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:700px;height:700px;border-radius:50%;border:2px solid rgba(255,206,84,0.12)"></div>
+        <div style="position:absolute;left:460px;top:140px;width:12px;height:16px;background:rgba(255,206,84,1);transform:rotate(24deg)"></div>
+        <div style="position:absolute;left:830px;top:170px;width:10px;height:14px;background:rgba(255,206,84,0.7);transform:rotate(-35deg)"></div>
+        <div style="position:absolute;left:410px;top:560px;width:10px;height:10px;border-radius:50%;background:rgba(255,206,84,0.8)"></div>
+        <div style="position:absolute;left:880px;top:540px;width:12px;height:16px;background:rgba(255,206,84,1);transform:rotate(48deg)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:480px;background:rgba(28,21,48,1);border:1px solid rgba(255,206,84,0.45);border-radius:24px;box-shadow:0 8px 0 rgba(8,5,16,1);padding:38px 48px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div style="font-size:18px;font-weight:700;letter-spacing:4px;color:rgba(178,168,210,1)">GAME OVER</div>
+          <div style="font-size:54px;font-weight:800;font-style:italic;color:rgba(255,206,84,1);line-height:1">NEW BEST! ★</div>
+          <div style="font-size:72px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.05">51,730</div>
+          <div style="font-size:16px;font-weight:600;color:rgba(122,112,152,1)">previous best 48,200</div>
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;height:64px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:24px;font-weight:800;letter-spacing:2px;box-shadow:0 6px 0 rgba(98,178,22,1);margin-top:10px">PLAY AGAIN</div>
+          <div style="font-size:18px;font-weight:700;letter-spacing:1.5px;color:rgba(178,168,210,1);margin-top:6px">BACK TO MENU</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1f LIFE LOST -->
+    <div id="1f" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1f" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1f</a><span style="font-size:20px;font-weight:700">06 · Life lost interstitial</span><span style="font-size:14px;color:rgba(178,168,210,1)">~0.9s, no input lock; text floats up from death point</span></div>
+      <div style="position:relative;width:1280px;height:720px;border:1px solid rgba(233,226,255,0.10)">
+        <dc-import name="Antidote Frame" level="3" score="12450" best="48200" lives="1" meter="54" hint-size="1280px,720px" style="position:absolute;inset:0"></dc-import>
+        <div style="position:absolute;left:120px;top:0;width:1040px;height:720px;background:radial-gradient(ellipse at 52% 46%, transparent 48%, rgba(255,92,72,0.26))"></div>
+        <div style="position:absolute;left:660px;top:150px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="font-size:46px;font-weight:800;font-style:italic;color:rgba(255,92,72,1);letter-spacing:1px">−1 LIFE</div>
+          <div style="font-size:16px;font-weight:700;letter-spacing:3px;color:rgba(178,168,210,1)">1 LEFT — BREATHE</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1g HELP -->
+    <div id="1g" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1g" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1g</a><span style="font-size:20px;font-weight:700">07 · Help / About overlay</span></div>
+      <div style="position:relative;width:1280px;height:720px;background-color:rgba(15,11,26,1);background-image:linear-gradient(rgba(180,150,255,0.05) 1px, transparent 1px),linear-gradient(90deg, rgba(180,150,255,0.05) 1px, transparent 1px);background-size:40px 40px;overflow:hidden;border:1px solid rgba(233,226,255,0.10)">
+        <div style="position:absolute;inset:0;background:rgba(10,7,20,0.6)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:720px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;box-shadow:0 8px 0 rgba(8,5,16,1);padding:44px 52px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px">
+          <div style="font-size:40px;font-weight:800;font-style:italic">HOW TO PLAY</div>
+          <div style="font-size:20px;line-height:1.6;color:rgba(178,168,210,1)">Viruses are loose in the dish! <b style="color:rgba(178,255,66,1)">Press and hold</b> anywhere to blow a bubble — let go, and anything caught inside is stuck. Keep a virus bubbled for <b style="color:rgba(178,255,66,1)">3 seconds</b> to cure it.</div>
+          <div style="font-size:20px;line-height:1.6;color:rgba(178,168,210,1)">Every bubble drains your <b style="color:rgba(178,255,66,1)">antidote</b>, and a virus touching a <i>growing</i> bubble costs a <b style="color:rgba(255,92,72,1)">life</b>. Clear the dish to advance. That’s it — go save the petri dish.</div>
+          <div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:13px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">SOURCE</span><span style="font-size:18px;font-weight:600;color:rgba(178,255,66,1);text-decoration:underline">github.com/‹your-org›/antidote</span></div>
+          <div style="display:flex;align-items:center;justify-content:center;width:200px;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 6px 0 rgba(8,5,16,1);align-self:center;margin-top:8px">BACK</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1h FILE -->
+    <div id="1h" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1h" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1h</a><span style="font-size:20px;font-weight:700">08 · File overlay (save data)</span></div>
+      <div style="position:relative;width:1280px;height:720px;background-color:rgba(15,11,26,1);background-image:linear-gradient(rgba(180,150,255,0.05) 1px, transparent 1px),linear-gradient(90deg, rgba(180,150,255,0.05) 1px, transparent 1px);background-size:40px 40px;overflow:hidden;border:1px solid rgba(233,226,255,0.10)">
+        <div style="position:absolute;inset:0;background:rgba(10,7,20,0.6)"></div>
+        <div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);width:540px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;box-shadow:0 8px 0 rgba(8,5,16,1);padding:44px 48px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px">
+          <div style="font-size:40px;font-weight:800;font-style:italic">SAVE DATA</div>
+          <div style="display:flex;align-items:center;gap:18px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:16px;box-shadow:0 4px 0 rgba(8,5,16,1);padding:18px 22px">
+            <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:rgba(28,21,48,1);border:2px solid rgba(178,255,66,1);color:rgba(178,255,66,1);font-size:24px;font-weight:800">↑</span>
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:22px;font-weight:800;letter-spacing:1px">EXPORT SAVE…</span><span style="font-size:15px;color:rgba(178,168,210,1)">copy your progress to a file</span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:18px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:16px;box-shadow:0 4px 0 rgba(8,5,16,1);padding:18px 22px">
+            <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:rgba(28,21,48,1);border:2px solid rgba(178,255,66,1);color:rgba(178,255,66,1);font-size:24px;font-weight:800">↓</span>
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:22px;font-weight:800;letter-spacing:1px">IMPORT SAVE…</span><span style="font-size:15px;color:rgba(178,168,210,1)">load progress from a file</span></span>
+          </div>
+          <div style="font-size:15px;font-weight:600;color:rgba(122,112,152,1)">saves live on this device only — no accounts, no cloud</div>
+          <div style="display:flex;align-items:center;justify-content:center;width:200px;height:56px;border-radius:16px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 6px 0 rgba(8,5,16,1);align-self:center;margin-top:6px">BACK</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1i ROTATE -->
+    <div id="1i" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1i" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1i</a><span style="font-size:20px;font-weight:700">09 · Rotate prompt</span><span style="font-size:14px;color:rgba(178,168,210,1)">portrait phones, fills viewport</span></div>
+      <div style="position:relative;width:720px;height:1280px;background-color:rgba(15,11,26,1);background-image:linear-gradient(rgba(180,150,255,0.05) 1px, transparent 1px),linear-gradient(90deg, rgba(180,150,255,0.05) 1px, transparent 1px);background-size:40px 40px;overflow:hidden;border:1px solid rgba(233,226,255,0.10);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px">
+        <div style="position:relative;width:340px;height:340px">
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-18deg);width:150px;height:270px;border:5px solid rgba(240,236,255,1);border-radius:30px;background:rgba(20,15,36,1)">
+            <div style="position:absolute;left:50%;top:12px;transform:translateX(-50%);width:44px;height:8px;border-radius:999px;background:rgba(122,112,152,0.6)"></div>
+            <div style="position:absolute;left:36px;top:96px;width:66px;height:66px;border-radius:50%;border:3px solid rgba(178,255,66,0.9);background:radial-gradient(circle at 35% 30%, rgba(178,255,66,0.2), rgba(178,255,66,0.03) 72%)"></div>
+            <div style="position:absolute;left:56px;top:116px;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 32%, rgba(255,140,110,1), rgba(255,92,72,1) 45%, rgba(150,28,40,1) 95%)"></div>
+          </div>
+          <div style="position:absolute;left:20px;top:6px;width:300px;height:300px;border:4px solid transparent;border-top-color:rgba(178,255,66,1);border-right-color:rgba(178,255,66,1);border-radius:50%;transform:rotate(12deg)"></div>
+          <div style="position:absolute;right:12px;top:112px;width:4px;height:26px;background:rgba(178,255,66,1);border-radius:2px;transform:rotate(-38deg)"></div>
+          <div style="position:absolute;right:2px;top:104px;width:26px;height:4px;background:rgba(178,255,66,1);border-radius:2px;transform:rotate(-38deg)"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:0 60px">
+          <div style="font-size:46px;font-weight:800;font-style:italic;color:rgba(178,255,66,1)">TURN ME SIDEWAYS!</div>
+          <div style="font-size:22px;font-weight:600;color:rgba(178,168,210,1);line-height:1.5">Antidote plays in landscape.</div>
+          <div style="font-size:17px;font-style:italic;color:rgba(122,112,152,1)">the viruses need the elbow room</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1j FIRST-RUN HINTS -->
+    <div id="1j" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;align-items:baseline"><a href="#1j" style="text-decoration:none;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10);border-radius:8px;padding:2px 10px;font-size:14px;font-weight:800">1j</a><span style="font-size:20px;font-weight:700">10 · First-run hint overlay</span><span style="font-size:14px;color:rgba(178,168,210,1)">level 1 only, once; also dismisses on first successful cure</span></div>
+      <div style="position:relative;width:1280px;height:720px;border:1px solid rgba(233,226,255,0.10)">
+        <dc-import name="Antidote Frame" level="1" score="0" best="48200" lives="3" meter="100" hint-size="1280px,720px" style="position:absolute;inset:0"></dc-import>
+        <div style="position:absolute;left:120px;top:0;width:1040px;height:720px;background:rgba(10,7,20,0.45)"></div>
+        <div style="position:absolute;left:330px;top:430px;width:90px;height:90px;border-radius:50%;border:3px solid rgba(178,255,66,0.9)"></div>
+        <div style="position:absolute;left:359px;top:459px;width:32px;height:32px;border-radius:50%;background:rgba(240,236,255,0.9)"></div>
+        <div style="position:absolute;left:290px;top:540px;width:220px;background:rgba(38,29,64,0.96);border:1px solid rgba(178,255,66,0.5);border-radius:14px;padding:12px 16px;box-sizing:border-box;font-size:19px;font-weight:600;line-height:1.4;text-align:center"><b style="color:rgba(178,255,66,1)">HOLD</b> anywhere — a bubble grows</div>
+        <div style="position:absolute;left:790px;top:330px;width:230px;background:rgba(38,29,64,0.96);border:1px solid rgba(178,255,66,0.5);border-radius:14px;padding:12px 16px;box-sizing:border-box;font-size:19px;font-weight:600;line-height:1.4;text-align:center">keep a virus inside <b style="color:rgba(178,255,66,1)">3s</b> to cure it</div>
+        <div style="position:absolute;left:762px;top:372px;width:28px;height:2px;background:rgba(178,255,66,0.8)"></div>
+        <div style="position:absolute;left:150px;top:380px;width:230px;background:rgba(38,29,64,0.96);border:1px solid rgba(178,255,66,0.5);border-radius:14px;padding:12px 16px;box-sizing:border-box;font-size:19px;font-weight:600;line-height:1.4;text-align:center">bubbles cost <b style="color:rgba(178,255,66,1)">ANTIDOTE</b> — don’t run dry</div>
+        <div style="position:absolute;left:126px;top:422px;width:24px;height:2px;background:rgba(178,255,66,0.8)"></div>
+        <div style="position:absolute;left:640px;top:640px;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;width:220px;height:56px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:22px;font-weight:800;letter-spacing:2px;box-shadow:0 6px 0 rgba(98,178,22,1)">GOT IT!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DESIGN TOKENS ============ -->
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div style="font-size:32px;font-weight:800;font-style:italic">Design tokens</div>
+    <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+
+      <div style="width:1280px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;padding:36px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px">
+        <div style="font-size:20px;font-weight:800;letter-spacing:1px">COLOR</div>
+        <div style="display:flex;flex-wrap:wrap;gap:20px">
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(15,11,26,1);border:1px solid rgba(233,226,255,0.10)"></div><div style="font-size:16px;font-weight:800">ink-900 · rgba(15,11,26,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">canvas background</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(20,15,36,1);border:1px solid rgba(233,226,255,0.10)"></div><div style="font-size:16px;font-weight:800">ink-800 · rgba(20,15,36,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">playfield dish</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10)"></div><div style="font-size:16px;font-weight:800">ink-700 · rgba(28,21,48,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">rails, panels</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(38,29,64,1);border:1px solid rgba(233,226,255,0.10)"></div><div style="font-size:16px;font-weight:800">ink-600 · rgba(38,29,64,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">raised: buttons, chips, meter track</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(8,5,16,1);border:1px solid rgba(233,226,255,0.10)"></div><div style="font-size:16px;font-weight:800">edge-950 · rgba(8,5,16,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">hard-shadow offsets (solid rect, 0/4–8u down)</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(178,255,66,1)"></div><div style="font-size:16px;font-weight:800">lime-500 · rgba(178,255,66,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">antidote, primary actions, bubbles</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(98,178,22,1)"></div><div style="font-size:16px;font-weight:800">lime-700 · rgba(98,178,22,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">primary button hard edge</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(255,92,72,1)"></div><div style="font-size:16px;font-weight:800">coral-500 · rgba(255,92,72,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">viruses, danger, meter low</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(150,28,40,1)"></div><div style="font-size:16px;font-weight:800">coral-800 · rgba(150,28,40,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">virus gradient rim (center rgba(255,140,110,1))</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(255,196,54,1)"></div><div style="font-size:16px;font-weight:800">amber-500 · rgba(255,196,54,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">meter 34–66%</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(255,206,84,1)"></div><div style="font-size:16px;font-weight:800">gold-400 · rgba(255,206,84,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">best score, celebration</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(158,120,255,1)"></div><div style="font-size:16px;font-weight:800">violet-400 · rgba(158,120,255,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">arena stroke @0.35, grid @0.06, confetti</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(240,236,255,1)"></div><div style="font-size:16px;font-weight:800;color:rgba(240,236,255,1)">text-hi · rgba(240,236,255,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">primary text, icons</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(178,168,210,1)"></div><div style="font-size:16px;font-weight:800">text-mid · rgba(178,168,210,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">body, secondary text</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(122,112,152,1)"></div><div style="font-size:16px;font-weight:800">text-low · rgba(122,112,152,1)</div><div style="font-size:13px;color:rgba(178,168,210,1)">labels, captions</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(233,226,255,0.10);border:1px solid rgba(233,226,255,0.10)"></div><div style="font-size:16px;font-weight:800">hairline · rgba(233,226,255,0.10)</div><div style="font-size:13px;color:rgba(178,168,210,1)">1px strokes, dividers</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:rgba(10,7,20,0.78)"></div><div style="font-size:16px;font-weight:800">scrim · rgba(10,7,20,0.78)</div><div style="font-size:13px;color:rgba(178,168,210,1)">overlays (0.45 first-run, 0.82 game over)</div></div>
+          <div style="width:264px;display:flex;flex-direction:column;gap:6px"><div style="height:52px;border-radius:10px;background:radial-gradient(circle at 35% 30%, rgba(178,255,66,0.20), rgba(178,255,66,0.03) 72%);border:2px solid rgba(210,255,140,0.85)"></div><div style="font-size:16px;font-weight:800">bubble</div><div style="font-size:13px;color:rgba(178,168,210,1)">radial rgba(178,255,66,0.20)→rgba(178,255,66,0.03); stroke rgba(210,255,140,0.85) 2px</div></div>
+        </div>
+      </div>
+
+      <div style="width:1280px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;padding:36px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:20px;font-weight:800;letter-spacing:1px">TYPE — Exo 2 (one variable TTF, SIL OFL)</div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:96px;font-weight:800;font-style:italic;letter-spacing:-2px;line-height:1">Aa 96</span><span style="font-size:14px;color:rgba(178,168,210,1)">display · 800 italic · ls −2 · title logo</span></div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:52px;font-weight:800;font-style:italic;line-height:1">Aa 52</span><span style="font-size:14px;color:rgba(178,168,210,1)">overlay title · 800 italic (48–56 by screen)</span></div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:40px;font-weight:800;font-variant-numeric:tabular-nums">0,123</span><span style="font-size:14px;color:rgba(178,168,210,1)">big number · 800 · tabular figures (level 40 / score 30 / best 20 / game-over 72)</span></div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:24px;font-weight:800;letter-spacing:2px">BUTTON 24</span><span style="font-size:14px;color:rgba(178,168,210,1)">primary 24 / secondary 19–20 / chips 17 · 800 · caps · ls 1.5–2</span></div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:20px;font-weight:500">Body 20 — readable at arm's length on a phone.</span><span style="font-size:14px;color:rgba(178,168,210,1)">500 · lh 1.6</span></div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:14px;font-weight:700;letter-spacing:2.5px;color:rgba(122,112,152,1)">LABEL 14</span><span style="font-size:14px;color:rgba(178,168,210,1)">700 · caps · ls 2.5 · rail labels (13 on ANTIDOTE)</span></div>
+        <div style="display:flex;align-items:baseline;gap:24px"><span style="font-size:15px;font-weight:600;color:rgba(122,112,152,1)">caption 15</span><span style="font-size:14px;color:rgba(178,168,210,1)">600 · hints, footnotes (15–16)</span></div>
+      </div>
+
+      <div style="width:624px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;padding:36px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:20px;font-weight:800;letter-spacing:1px">SPACING · RADII · STROKES</div>
+        <div style="font-size:16px;color:rgba(178,168,210,1);line-height:1.7">Spacing scale (units): <b style="color:rgba(240,236,255,1)">4 · 8 · 12 · 16 · 24 · 32 · 48 · 64</b>. Grid cell 40. Safe inset for interactive controls: 24 from canvas edges.<br>Radii: <b style="color:rgba(240,236,255,1)">8</b> badges · <b style="color:rgba(240,236,255,1)">14</b> chips/callouts · <b style="color:rgba(240,236,255,1)">16</b> buttons · <b style="color:rgba(240,236,255,1)">20</b> arena/cards · <b style="color:rgba(240,236,255,1)">24</b> panels · <b style="color:rgba(240,236,255,1)">999</b> pills/meter.<br>Strokes: <b style="color:rgba(240,236,255,1)">1</b> hairlines · <b style="color:rgba(240,236,255,1)">2</b> arena, bubble, meter track, icon rings · <b style="color:rgba(240,236,255,1)">3</b> cure-timer arc, hint rings.<br>Touch targets: rail buttons <b style="color:rgba(240,236,255,1)">56×56</b>, chips h48, all ≥44 with ≥12 gaps.</div>
+      </div>
+
+      <div style="width:624px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;padding:36px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px">
+        <div style="font-size:20px;font-weight:800;letter-spacing:1px">BUTTON STATES (primary)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="display:flex;align-items:center;justify-content:center;width:150px;height:56px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 6px 0 rgba(98,178,22,1)">PLAY</div><span style="font-size:13px;color:rgba(178,168,210,1)">default</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="display:flex;align-items:center;justify-content:center;width:150px;height:56px;border-radius:16px;background:rgba(198,255,110,1);color:rgba(15,11,26,1);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 7px 0 rgba(98,178,22,1);transform:translateY(-1px)">PLAY</div><span style="font-size:13px;color:rgba(178,168,210,1)">hover — fill rgba(198,255,110,1), −1u</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="display:flex;align-items:center;justify-content:center;width:150px;height:56px;border-radius:16px;background:rgba(150,225,48,1);color:rgba(15,11,26,1);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 2px 0 rgba(98,178,22,1);transform:translateY(4px)">PLAY</div><span style="font-size:13px;color:rgba(178,168,210,1)">pressed — fill rgba(150,225,48,1), +4u, edge 2</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="display:flex;align-items:center;justify-content:center;width:150px;height:56px;border-radius:16px;background:rgba(178,255,66,1);color:rgba(15,11,26,1);font-size:19px;font-weight:800;letter-spacing:1.5px;box-shadow:0 6px 0 rgba(98,178,22,1),0 0 0 2px rgba(15,11,26,1),0 0 0 4px rgba(240,236,255,0.9)">PLAY</div><span style="font-size:13px;color:rgba(178,168,210,1)">focus — 2px text-hi ring, 2u offset</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="display:flex;align-items:center;justify-content:center;width:150px;height:56px;border-radius:16px;background:rgba(178,255,66,0.18);color:rgba(240,236,255,0.35);font-size:19px;font-weight:800;letter-spacing:1.5px">PLAY</div><span style="font-size:13px;color:rgba(178,168,210,1)">disabled — fill @0.18, text @0.35, no edge</span></div>
+        </div>
+        <div style="font-size:15px;color:rgba(178,168,210,1);line-height:1.6">Secondary: ink-600 fill, hairline stroke, edge-950 hard edge; hover raises fill to rgba(48,37,80,1); pressed +4u. Ghost (BACK TO MENU): text-mid, hover text-hi + underline. Rail buttons follow secondary states with a lime stroke when active (e.g. paused, muted).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RATIONALE + ANIMATION ============ -->
+  <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+    <div style="width:1280px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;padding:36px 44px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:20px;font-weight:800;letter-spacing:1px">RATIONALE — canvas & rails</div>
+      <div style="font-size:17px;color:rgba(178,168,210,1);line-height:1.7">
+        <b style="color:rgba(240,236,255,1)">1280×720:</b> exact 16:9 in integers, divisible by the 40-unit grid and the 4-unit spacing base, and maps 1:1 to 720p / 2:1 to 1440p so strokes stay crisp at common window sizes.<br>
+        <b style="color:rgba(240,236,255,1)">120 / 1040 / 120 split:</b> a 120-unit rail is the minimum that fits a 56-unit touch target with 24-unit insets on both sides (24+56+24=104) plus breathing room; the playfield gains ~30% area over 800×600 while keeping shapes round. Arena inset 12, stroke 2, radius 20 → live area 1016×696.<br>
+        <b style="color:rgba(240,236,255,1)">Desktop vs phone:</b> identical layout — the canvas scales uniformly. On 19.5:9–20:9 phones the 16:9 canvas letterboxes ~40–60 physical px per side; rail controls sit ≥24 units inside the canvas, so even with OS insets they clear notches and corner radii. Hover states are desktop-only; pressed states are shared. Pause top-left and fullscreen top-right land directly under thumbs resting on the phone's short edges in landscape.<br>
+        <b style="color:rgba(240,236,255,1)">Teaching without words:</b> bubble and meter share the lime "antidote" color, so draining reads as cause→effect; the cure timer is a depleting arc on the bubble itself; the first-run overlay (<a href="#1j">1j</a>) reinforces all three once.
+      </div>
+    </div>
+    <div style="width:1280px;background:rgba(28,21,48,1);border:1px solid rgba(233,226,255,0.10);border-radius:24px;padding:36px 44px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:20px;font-weight:800;letter-spacing:1px">ANIMATION NOTES — all transform/alpha only</div>
+      <div style="font-size:17px;color:rgba(178,168,210,1);line-height:1.7">
+        <b style="color:rgba(240,236,255,1)">Menu in:</b> logo scales 0.92→1 with overshoot cubic-bezier(0.34,1.56,0.64,1) 320ms; buttons/panels fade+rise 12u, 40ms stagger. The logo's O-bubble drifts ±3u vertically, 3s sine loop; its trapped virus wiggles ±4° at 1.5s.<br>
+        <b style="color:rgba(240,236,255,1)">Overlays (pause, level clear, game over, help, file):</b> scrim alpha 0→target 160ms ease-out; panel scale 0.94→1 + overshoot 220ms; exit 120ms ease-in to 0.96, scrim out 140ms. Pause must feel instant: gameplay halts frame 1, visuals catch up.<br>
+        <b style="color:rgba(240,236,255,1)">Antidote bar:</b> drain tracks value with 90ms linear smoothing; refills ease-out 300ms; color crossfades 150ms at 34%/67% thresholds; below 25% the fill pulses alpha 1→0.6→1 at 800ms and the % label turns coral.<br>
+        <b style="color:rgba(240,236,255,1)">Score:</b> counts up over 240ms (ease-out); on change digits pop scale 1→1.18→1 in 100ms. Cure awards spawn a floating "+250" at the pop, rising 40u fading 600ms.<br>
+        <b style="color:rgba(240,236,255,1)">New best:</b> at the moment score passes best mid-run, BEST value flips gold with a 1→1.3→1 pop; on game over, gold rings expand 0→560/700u fading 500ms, confetti (24 rects, gravity ~900u/s², spin ±540°/s) for 1.2s.<br>
+        <b style="color:rgba(240,236,255,1)">Life lost:</b> coral vignette alpha 0→0.26→0 over 400ms; "−1 LIFE" floats up 60u fading 900ms from the death point; the lost pip scales 1→1.6 fading 300ms.<br>
+        <b style="color:rgba(240,236,255,1)">Cure timer:</b> arc sweeps linearly; final second, arc + bubble stroke pulse at 4Hz; on cure, bubble scales 1→1.15 then pops to 12 particles (350ms).
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+</body>
+</html>
