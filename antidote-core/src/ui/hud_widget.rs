@@ -426,11 +426,20 @@ mod tests {
     #[test]
     fn side_columns_on_wide_canvases() {
         // 1600x600: full-height playfield is 800 wide, leaving 400 per side.
-        assert_eq!(HudLayout::for_available(1600.0, 600.0), HudLayout::SideColumns);
+        assert_eq!(
+            HudLayout::for_available(1600.0, 600.0),
+            HudLayout::SideColumns
+        );
         // iPhone-ish landscape: 844x390 → playfield 520 wide, 162 per side.
-        assert_eq!(HudLayout::for_available(844.0, 390.0), HudLayout::SideColumns);
+        assert_eq!(
+            HudLayout::for_available(844.0, 390.0),
+            HudLayout::SideColumns
+        );
         // Exactly 100 per side — just over the 92 threshold.
-        assert_eq!(HudLayout::for_available(1000.0, 600.0), HudLayout::SideColumns);
+        assert_eq!(
+            HudLayout::for_available(1000.0, 600.0),
+            HudLayout::SideColumns
+        );
     }
 
     #[test]

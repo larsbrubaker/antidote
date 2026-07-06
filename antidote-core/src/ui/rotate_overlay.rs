@@ -138,10 +138,7 @@ impl Widget for RotateOverlay {
         let head = 10.0;
         ctx.set_fill_color(dim_color);
         ctx.begin_path();
-        ctx.move_to(
-            tip_x + head * tangent.cos(),
-            tip_y + head * tangent.sin(),
-        );
+        ctx.move_to(tip_x + head * tangent.cos(), tip_y + head * tangent.sin());
         ctx.line_to(
             tip_x + head * 0.6 * (end + std::f64::consts::PI).cos(),
             tip_y + head * 0.6 * (end + std::f64::consts::PI).sin(),
