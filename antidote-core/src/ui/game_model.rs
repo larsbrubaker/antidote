@@ -76,6 +76,11 @@ pub struct GameModel {
     /// `screen.orientation.lock('landscape')`. Enter-only, unlike
     /// `pending_fullscreen_toggle`. Cleared by the drain.
     pub pending_enter_fullscreen: bool,
+    /// Set when the player clicks a hyperlink (currently the Help panel's
+    /// SOURCE repo link). The platform shell drains this each frame and
+    /// opens the URL — a new browser tab on web, the default browser on
+    /// native. Cleared by the drain.
+    pub pending_open_url: Option<String>,
     /// `settings.best_score` as it stood when the current run started.
     /// `maybe_record_best_score` bumps the live best every frame, so this
     /// snapshot is the only way the game-over screen can tell "you beat
@@ -100,6 +105,7 @@ impl GameModel {
             pending_fullscreen_toggle: false,
             is_mobile: false,
             pending_enter_fullscreen: false,
+            pending_open_url: None,
             session_start_best: 0,
         }
     }

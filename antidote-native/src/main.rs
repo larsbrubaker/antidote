@@ -133,7 +133,7 @@ fn main() {
 
     let mut gpu = Gpu::new(window.clone());
 
-    let (mut app, _model) = build_antidote_app_with_store(FileSettingsStore::into_shared());
+    let (mut app, model) = build_antidote_app_with_store(FileSettingsStore::into_shared());
     let mut wgpu_ctx = WgpuGfxCtx::new(
         Arc::clone(&gpu.device),
         Arc::clone(&gpu.queue),
@@ -267,6 +267,11 @@ fn main() {
             }
 
             Event::AboutToWait => {
+                // Hyperlink clicks (Help panel's SOURCE line) → default
+                // browser. Same drain-each-frame pattern as the wasm shell.
+                if let Some(url) = model.borrow_mut().pending_open_url.take() {
+                    open_in_browser(&url);
+                }
                 // Continuous animation — keep redrawing.
                 window.request_redraw();
             }
@@ -274,6 +279,28 @@ fn main() {
             _ => {}
         })
         .expect("event loop");
+}
+
+/// Open `url` in the system default browser. Best-effort: failures are
+/// logged, not fatal — the URL is also visible on-screen for hand-typing.
+fn open_in_browser(url: &str) {
+    // Only ever launch plain https URLs; anything else smells like
+    // argument injection into the shell below.
+    if !url.starts_with("https://") {
+        eprintln!("antidote: refusing to open non-https URL: {url}");
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+    if let Err(err) = result {
+        eprintln!("antidote: failed to open {url} in a browser: {err}");
+    }
 }
 
 /// Render one frame and return the wall-time spent on actual paint work

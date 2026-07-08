@@ -39,6 +39,11 @@ pub struct HelpOverlay {
     model: SharedModel,
     fonts: Fonts,
     buttons: ButtonSet,
+    /// Hit rect of the SOURCE repo link, in widget-local Y-up coords.
+    /// Updated each paint (the link's baseline depends on how the
+    /// paragraphs above it wrapped, which only paint knows).
+    link_rect: Rect,
+    link_hover: bool,
 }
 
 impl HelpOverlay {
@@ -49,6 +54,8 @@ impl HelpOverlay {
             model,
             fonts,
             buttons: ButtonSet::default(),
+            link_rect: Rect::default(),
+            link_hover: false,
         }
     }
 
@@ -119,9 +126,11 @@ impl Widget for HelpOverlay {
         self.buttons.clear();
         self.buttons.push(KitButton {
             id: "back",
+            // Y-up: low offset = near the panel's bottom edge, clear of the
+            // SOURCE line above it.
             rect: Rect::new(
                 panel.x + (PANEL_W - 200.0) * 0.5,
-                panel.y + 32.0,
+                panel.y + 12.0,
                 200.0,
                 56.0,
             ),
@@ -197,14 +206,34 @@ impl Widget for HelpOverlay {
             },
         );
 
+        let src_baseline = after_p2 - 40.0;
         ctx.set_font(self.fonts.bold.clone());
         ctx.set_font_size(13.0);
         ctx.set_fill_color(theme::TEXT_LOW);
-        fill_text_tracked(ctx, "SOURCE", x, after_p2 - 40.0, 2.5);
+        fill_text_tracked(ctx, "SOURCE", x, src_baseline, 2.5);
+
+        // Repo link — hot: brighter + underlined on hover, click opens it.
+        let link_x = x + 80.0;
         ctx.set_font(self.fonts.semibold.clone());
         ctx.set_font_size(18.0);
-        ctx.set_fill_color(theme::LIME_500);
-        fill_text_tracked(ctx, REPO_URL, x + 80.0, after_p2 - 40.0, 0.0);
+        let link_w = ctx.measure_text(REPO_URL).map(|m| m.width).unwrap_or(0.0);
+        // Hit rect wraps the text line: baseline - descender up to cap height.
+        self.link_rect = Rect::new(link_x, src_baseline - 6.0, link_w, 26.0);
+        let link_color = if self.link_hover {
+            theme::LIME_400
+        } else {
+            theme::LIME_500
+        };
+        ctx.set_fill_color(link_color);
+        fill_text_tracked(ctx, REPO_URL, link_x, src_baseline, 0.0);
+        if self.link_hover {
+            ctx.set_stroke_color(link_color);
+            ctx.set_line_width(1.5);
+            ctx.begin_path();
+            ctx.move_to(link_x, src_baseline - 4.0);
+            ctx.line_to(link_x + link_w, src_baseline - 4.0);
+            ctx.stroke();
+        }
 
         self.buttons.paint(ctx, &self.fonts);
     }
@@ -213,9 +242,87 @@ impl Widget for HelpOverlay {
             self.model.borrow_mut().menu_view = MenuView::Main;
             return EventResult::Consumed;
         }
+        match event {
+            Event::MouseMove { pos } => {
+                self.link_hover = self.link_rect.contains(*pos);
+            }
+            Event::MouseUp {
+                pos,
+                button: agg_gui::MouseButton::Left,
+                ..
+            } if self.link_rect.contains(*pos) => {
+                self.model.borrow_mut().pending_open_url = Some(format!("https://{REPO_URL}"));
+                return EventResult::Consumed;
+            }
+            _ => {}
+        }
         swallow_mouse(event)
     }
     fn needs_draw(&self) -> bool {
         self.is_visible()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agg_gui::geometry::Size;
+    use agg_gui::{Framebuffer, GfxCtx, Modifiers, MouseButton, Point};
+
+    /// Full click-through: lay out + paint (which measures the link and sets
+    /// its hit rect), then release the mouse on the link. The model must end
+    /// up with `pending_open_url` set to the https repo URL — that's the
+    /// contract the platform shells' drains rely on.
+    #[test]
+    fn clicking_source_link_requests_url_open() {
+        let model = crate::ui::game_model::shared();
+        let mut overlay = HelpOverlay::new(model.clone(), Fonts::load());
+        let size = Size::new(theme::APP_W, theme::APP_H);
+        overlay.set_bounds(Rect::new(0.0, 0.0, theme::APP_W, theme::APP_H));
+        overlay.layout(size);
+        let mut fb = Framebuffer::new(theme::APP_W as u32, theme::APP_H as u32);
+        let mut ctx = GfxCtx::new(&mut fb);
+        overlay.paint(&mut ctx);
+        assert!(
+            overlay.link_rect.width > 0.0,
+            "paint must measure the link and set its hit rect"
+        );
+
+        let p = Point::new(
+            overlay.link_rect.x + overlay.link_rect.width * 0.5,
+            overlay.link_rect.y + overlay.link_rect.height * 0.5,
+        );
+        overlay.on_event(&Event::MouseMove { pos: p });
+        assert!(overlay.link_hover, "hover must arm on the link");
+        let result = overlay.on_event(&Event::MouseUp {
+            pos: p,
+            button: MouseButton::Left,
+            modifiers: Modifiers::default(),
+        });
+        assert_eq!(result, EventResult::Consumed);
+        assert_eq!(
+            model.borrow().pending_open_url.as_deref(),
+            Some("https://github.com/larsbrubaker/antidote")
+        );
+    }
+
+    /// A release outside the link must not request an open.
+    #[test]
+    fn release_off_link_does_not_open() {
+        let model = crate::ui::game_model::shared();
+        let mut overlay = HelpOverlay::new(model.clone(), Fonts::load());
+        let size = Size::new(theme::APP_W, theme::APP_H);
+        overlay.set_bounds(Rect::new(0.0, 0.0, theme::APP_W, theme::APP_H));
+        overlay.layout(size);
+        let mut fb = Framebuffer::new(theme::APP_W as u32, theme::APP_H as u32);
+        let mut ctx = GfxCtx::new(&mut fb);
+        overlay.paint(&mut ctx);
+
+        overlay.on_event(&Event::MouseUp {
+            pos: Point::new(10.0, 10.0),
+            button: MouseButton::Left,
+            modifiers: Modifiers::default(),
+        });
+        assert_eq!(model.borrow().pending_open_url, None);
     }
 }

@@ -43,31 +43,45 @@ pub struct KitButton {
 }
 
 /// A group of immediate-mode buttons with shared hover/press tracking.
+///
+/// Hover/press are keyed by button **id**, never by index into `buttons`:
+/// overlays rebuild the list from scratch inside `layout()`, which the
+/// platform shells run on *every frame*. Ids survive that rebuild; indices
+/// do not.
 #[derive(Default)]
 pub struct ButtonSet {
     pub buttons: Vec<KitButton>,
-    hovered: Option<usize>,
-    pressed: Option<usize>,
+    hovered: Option<&'static str>,
+    pressed: Option<&'static str>,
 }
 
 impl ButtonSet {
+    /// Drop the button list, **keeping** hover/press state.
+    ///
+    /// A click is `MouseDown` … `MouseUp`, and a real one lasts 50-150 ms —
+    /// always spanning at least one 60 Hz frame. Because `layout()` calls
+    /// this every frame, resetting `pressed` here would discard the press
+    /// before `MouseUp` arrived, and no button would ever fire. Synthetic
+    /// clicks that dispatch down+up inside a single frame still worked,
+    /// which is what made this so easy to miss.
     pub fn clear(&mut self) {
         self.buttons.clear();
-        self.hovered = None;
-        self.pressed = None;
     }
 
     pub fn push(&mut self, b: KitButton) {
         self.buttons.push(b);
     }
 
-    fn index_at(&self, p: Point) -> Option<usize> {
-        self.buttons.iter().position(|b| {
-            p.x >= b.rect.x
-                && p.x <= b.rect.x + b.rect.width
-                && p.y >= b.rect.y
-                && p.y <= b.rect.y + b.rect.height
-        })
+    fn id_at(&self, p: Point) -> Option<&'static str> {
+        self.buttons
+            .iter()
+            .find(|b| {
+                p.x >= b.rect.x
+                    && p.x <= b.rect.x + b.rect.width
+                    && p.y >= b.rect.y
+                    && p.y <= b.rect.y + b.rect.height
+            })
+            .map(|b| b.id)
     }
 
     /// Feed a widget-local event. Returns the id of a button that was
@@ -75,7 +89,7 @@ impl ButtonSet {
     pub fn on_event(&mut self, event: &Event) -> Option<&'static str> {
         match event {
             Event::MouseMove { pos } => {
-                self.hovered = self.index_at(*pos);
+                self.hovered = self.id_at(*pos);
                 None
             }
             Event::MouseDown {
@@ -83,7 +97,7 @@ impl ButtonSet {
                 button: MouseButton::Left,
                 ..
             } => {
-                self.pressed = self.index_at(*pos);
+                self.pressed = self.id_at(*pos);
                 None
             }
             Event::MouseUp {
@@ -92,9 +106,9 @@ impl ButtonSet {
                 ..
             } => {
                 let was = self.pressed.take();
-                let up = self.index_at(*pos);
+                let up = self.id_at(*pos);
                 match (was, up) {
-                    (Some(a), Some(b)) if a == b => Some(self.buttons[a].id),
+                    (Some(a), Some(b)) if a == b => Some(a),
                     _ => None,
                 }
             }
@@ -103,13 +117,13 @@ impl ButtonSet {
     }
 
     pub fn paint(&self, ctx: &mut dyn DrawCtx, fonts: &Fonts) {
-        for (i, b) in self.buttons.iter().enumerate() {
+        for b in &self.buttons {
             paint_kit_button(
                 ctx,
                 fonts,
                 b,
-                self.hovered == Some(i),
-                self.pressed == Some(i),
+                self.hovered == Some(b.id),
+                self.pressed == Some(b.id),
             );
         }
     }
@@ -405,4 +419,81 @@ pub fn paint_logo_bubble(ctx: &mut dyn DrawCtx, cx: f64, cy: f64, r: f64, stroke
     ctx.circle(0.0, 0.0, r * 0.2);
     ctx.fill();
     ctx.restore();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agg_gui::Modifiers;
+
+    /// Rebuild the set the way every overlay's `layout()` does.
+    fn rebuild(set: &mut ButtonSet) {
+        set.clear();
+        set.push(KitButton {
+            id: "resume",
+            rect: Rect::new(100.0, 100.0, 200.0, 60.0),
+            label: "RESUME".into(),
+            kind: ButtonKind::Primary,
+            font_size: 24.0,
+        });
+    }
+
+    fn down(set: &mut ButtonSet, x: f64, y: f64) -> Option<&'static str> {
+        set.on_event(&Event::MouseDown {
+            pos: Point::new(x, y),
+            button: MouseButton::Left,
+            modifiers: Modifiers::default(),
+        })
+    }
+
+    fn up(set: &mut ButtonSet, x: f64, y: f64) -> Option<&'static str> {
+        set.on_event(&Event::MouseUp {
+            pos: Point::new(x, y),
+            button: MouseButton::Left,
+            modifiers: Modifiers::default(),
+        })
+    }
+
+    /// A click that spans a frame boundary must still fire. `layout()` runs
+    /// every frame and rebuilds the button list; a human click is 50-150 ms,
+    /// so `MouseUp` always lands after at least one rebuild.
+    #[test]
+    fn click_survives_layout_rebuild_between_press_and_release() {
+        let mut set = ButtonSet::default();
+        rebuild(&mut set);
+        assert_eq!(down(&mut set, 150.0, 130.0), None);
+
+        // …several frames render while the button is held down…
+        rebuild(&mut set);
+        rebuild(&mut set);
+
+        assert_eq!(up(&mut set, 150.0, 130.0), Some("resume"));
+    }
+
+    /// The sub-frame case that masked the bug: no rebuild between down/up.
+    #[test]
+    fn click_without_rebuild_still_fires() {
+        let mut set = ButtonSet::default();
+        rebuild(&mut set);
+        down(&mut set, 150.0, 130.0);
+        assert_eq!(up(&mut set, 150.0, 130.0), Some("resume"));
+    }
+
+    /// Press inside, release outside — must not fire, rebuild or not.
+    #[test]
+    fn release_outside_does_not_fire() {
+        let mut set = ButtonSet::default();
+        rebuild(&mut set);
+        down(&mut set, 150.0, 130.0);
+        rebuild(&mut set);
+        assert_eq!(up(&mut set, 10.0, 10.0), None);
+    }
+
+    /// Release without a press (press was consumed elsewhere) must not fire.
+    #[test]
+    fn release_without_press_does_not_fire() {
+        let mut set = ButtonSet::default();
+        rebuild(&mut set);
+        assert_eq!(up(&mut set, 150.0, 130.0), None);
+    }
 }

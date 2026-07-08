@@ -256,6 +256,18 @@ pub fn drain_pending_enter_fullscreen() -> bool {
     true
 }
 
+/// Called by the JS shell each frame. If a widget set
+/// `model.pending_open_url` (currently the Help panel's SOURCE repo link),
+/// returns the URL exactly once so the JS side can `window.open` it in a
+/// new tab — still inside the user-gesture window from the click, which
+/// popup blockers require.
+#[wasm_bindgen]
+pub fn drain_pending_open_url() -> Option<String> {
+    let model = shared_model_clone()?;
+    let mut m = model.borrow_mut();
+    m.pending_open_url.take()
+}
+
 fn ensure_wgpu_ctx(width: f32, height: f32) {
     WGPU_CTX.with(|ctx_cell| {
         if ctx_cell.borrow().is_some() {

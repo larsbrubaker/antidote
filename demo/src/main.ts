@@ -264,6 +264,16 @@ async function main() {
     input.click();
   };
 
+  // A hyperlink widget (Help panel's SOURCE line) sets
+  // `model.pending_open_url`. Drain each frame; open in a new tab. The
+  // click's user-gesture context carries to the next rAF, so popup
+  // blockers allow it.
+  const drainOpenUrl = () => {
+    const url = wasm.drain_pending_open_url?.();
+    if (typeof url !== "string") return;
+    window.open(url, "_blank", "noopener");
+  };
+
   let last = performance.now();
   const frame = (now: number) => {
     const frameMs = now - last;
@@ -275,6 +285,7 @@ async function main() {
     drainImport();
     drainFullscreenToggle();
     drainEnterFullscreen();
+    drainOpenUrl();
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

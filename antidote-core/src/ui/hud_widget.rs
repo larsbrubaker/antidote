@@ -448,38 +448,37 @@ fn paint_speaker_icon(ctx: &mut dyn DrawCtx, r: Rect, muted: bool) {
     let cx = r.x + r.width * 0.5;
     let cy = r.y + r.height * 0.5;
     ctx.set_fill_color(theme::TEXT_HI);
-    // Speaker body: box + cone.
+    // Speaker body: box + cone, mouth at x = cx - 3 opening right. Shifted
+    // 2px left of center so body + waves read centered as a unit.
     ctx.begin_path();
-    ctx.move_to(cx - 12.0, cy - 4.0);
-    ctx.line_to(cx - 6.0, cy - 4.0);
-    ctx.line_to(cx - 1.0, cy - 10.0);
-    ctx.line_to(cx - 1.0, cy + 10.0);
-    ctx.line_to(cx - 6.0, cy + 4.0);
-    ctx.line_to(cx - 12.0, cy + 4.0);
+    ctx.move_to(cx - 14.0, cy - 4.0);
+    ctx.line_to(cx - 8.0, cy - 4.0);
+    ctx.line_to(cx - 3.0, cy - 10.0);
+    ctx.line_to(cx - 3.0, cy + 10.0);
+    ctx.line_to(cx - 8.0, cy + 4.0);
+    ctx.line_to(cx - 14.0, cy + 4.0);
     ctx.close_path();
     ctx.fill();
     if muted {
-        // Slash instead of waves.
+        // Slash across the whole glyph, matching the reference mute icon.
         ctx.set_stroke_color(theme::TEXT_HI);
         ctx.set_line_width(3.0);
         ctx.begin_path();
-        ctx.move_to(cx + 3.0, cy - 9.0);
-        ctx.line_to(cx + 12.0, cy + 9.0);
+        ctx.move_to(cx - 13.0, cy + 12.0);
+        ctx.line_to(cx + 12.0, cy - 12.0);
         ctx.stroke();
     } else {
+        // Two sound-wave arcs off the cone mouth. `ccw: true` sweeps the
+        // short way from -0.8 up through 0 to 0.8 (Y-up positive angles are
+        // counterclockwise); `false` here wrapped the long way around and
+        // drew a big "C" over the body.
         ctx.set_stroke_color(theme::TEXT_HI);
-        ctx.set_line_width(2.0);
+        ctx.set_line_width(2.5);
         ctx.begin_path();
-        ctx.arc_to(cx - 1.0, cy, 7.0, -0.9, 0.9, false);
+        ctx.arc_to(cx - 3.0, cy, 7.0, -0.8, 0.8, true);
         ctx.stroke();
-        ctx.set_stroke_color(Color::rgba(
-            theme::TEXT_HI.r,
-            theme::TEXT_HI.g,
-            theme::TEXT_HI.b,
-            0.6,
-        ));
         ctx.begin_path();
-        ctx.arc_to(cx - 1.0, cy, 11.0, -0.9, 0.9, false);
+        ctx.arc_to(cx - 3.0, cy, 12.0, -0.8, 0.8, true);
         ctx.stroke();
     }
 }
