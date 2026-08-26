@@ -7,14 +7,14 @@
 //! `localStorage` persistence, and wasm-bindgen exports. It contains **no game
 //! or UI content**: every game rule, widget tree, menu, layout, and interface
 //! the user sees is shared via `antidote-core` (game logic + widget tree) and
-//! `demo-wgpu` (the wgpu rendering library shared with agg-gui).
+//! `agg-gui-wgpu` (agg-gui's wgpu rendering crate).
 //!
 //! - **Game / widget / layout code** → `antidote-core`
-//! - **GPU renderers (WGSL shaders, geometry, draw calls)** → `demo-wgpu`
+//! - **GPU renderers (WGSL shaders, geometry, draw calls)** → `agg-gui-wgpu`
 //! - **Platform shell (canvas + event forwarding + persistence backend)** →
 //!   here and `antidote-native`
 //!
-//! `demo-wgpu` targets WebGL2 via wgpu on `wasm32-unknown-unknown` (no WebGPU
+//! `agg-gui-wgpu` targets WebGL2 via wgpu on `wasm32-unknown-unknown` (no WebGPU
 //! dependency), so the game runs on every modern browser with WebGL2 support
 //! once the WASM render loop is wired.
 //!
@@ -31,7 +31,7 @@ use std::sync::Arc;
 
 use agg_gui::{App, Key, Modifiers, MouseButton};
 use antidote_core::ui::{build_antidote_app_with_store, game_model::SharedModel};
-use demo_wgpu::{begin_frame, WgpuGfxCtx};
+use agg_gui_wgpu::WgpuGfxCtx;
 use platform::LocalStorageSettingsStore;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -339,7 +339,7 @@ pub fn render(width: u32, height: u32, _frame_ms: f64) {
         ctx.set_surface_texture(frame.texture.clone());
         ctx.reset(width as f32, height as f32);
         ctx.set_lcd_mode(agg_gui::font_settings::lcd_enabled());
-        begin_frame(ctx, view);
+        ctx.begin_frame(view);
         APP.with(|app_cell| {
             let mut app = app_cell.borrow_mut();
             if let Some(app) = app.as_mut() {

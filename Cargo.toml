@@ -6,14 +6,15 @@ default-members = ["antidote-core", "antidote-native"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.87"
 authors = ["Lars Brubaker <larsbrubaker@matterhackers.com>"]
 license = "MIT"
 repository = "https://github.com/larsbrubaker/antidote"
 
 [workspace.dependencies]
-agg-gui = "0.2"
-demo-wgpu = { path = "../agg-gui/demo-wgpu", default-features = false }
+agg-gui = "0.5"
+agg-gui-wgpu = "0.5.1"
+agg-gui-shell = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 web-time = "1"
@@ -28,6 +29,8 @@ box2d-rust = "1.0"
 # ---------------------------------------------------------------------------
 [patch.crates-io]
 agg-gui = { path = "../agg-gui/agg-gui" }
+agg-gui-wgpu = { path = "../agg-gui/agg-gui-wgpu" }
+agg-gui-shell = { path = "../agg-gui/agg-gui-shell" }
 box2d-rust = { path = "../box2d-rust" }
 
 # ---------------------------------------------------------------------------
@@ -35,6 +38,9 @@ box2d-rust = { path = "../box2d-rust" }
 # box2d-rust are both expensive unoptimized — without this dev frame time drops
 # to ~5 fps. Mirrors agg-gui's own workspace profile.
 # ---------------------------------------------------------------------------
+[profile.dev]
+opt-level = 1
+
 [profile.dev.package."*"]
 opt-level = 2
 

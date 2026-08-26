@@ -15,10 +15,9 @@ test = false
 
 [dependencies]
 antidote-core = { path = "../antidote-core" }
-agg-gui = { workspace = true, features = ["winit-adapter", "clipboard"] }
-demo-wgpu = { workspace = true }
+agg-gui = { workspace = true, features = ["clipboard"] }
+# The window, event loop, wgpu surface, input forwarding and present all come
+# from agg-gui-shell now; this crate owns no winit/wgpu code of its own.
+agg-gui-shell = { workspace = true }
 serde_json = { workspace = true }
 dirs = "5"
-pollster = "0.4"
-wgpu = { version = "29", default-features = false, features = ["wgsl", "vulkan", "dx12", "metal"] }
-winit = "0.30"
