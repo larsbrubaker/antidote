@@ -30,8 +30,8 @@ use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use agg_gui::{App, Key, Modifiers, MouseButton};
-use antidote_core::ui::{build_antidote_app_with_store, game_model::SharedModel};
 use agg_gui_wgpu::WgpuGfxCtx;
+use antidote_core::ui::{build_antidote_app_with_store, game_model::SharedModel};
 use platform::LocalStorageSettingsStore;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
